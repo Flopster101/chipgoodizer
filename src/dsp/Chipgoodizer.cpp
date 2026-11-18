@@ -56,19 +56,24 @@ void Chipgoodizer::init(float sampleRate, const ChipgoodizerConfig &cfg)
     xoverL.init(config.xoverLowHz, config.xoverHighHz, fs);
     xoverR.init(config.xoverLowHz, config.xoverHighHz, fs);
 
-    envLowFast.init(fs, 2.0f, 18.0f);
-    envLowSlow.init(fs, 15.0f, 80.0f);
+    // Low band: smooth kick onset taper (1.5 ms / 38 ms) and sustain follower
+    // (15 ms / 40 ms) so bass note tails stay full without post-attack ducking.
+    envLowFast.init(fs, 1.5f, 38.0f);
+    envLowSlow.init(fs, 15.0f, 40.0f);
 
-    envMidFastL.init(fs, 1.0f, 15.0f);
-    envMidFastR.init(fs, 1.0f, 15.0f);
-    envMidSlowL.init(fs, 25.0f, 80.0f);
-    envMidSlowR.init(fs, 25.0f, 80.0f);
+    // Mid band: smooth transient taper (0.8 ms / 28 ms) and quick-recovering
+    // body detector (16 ms / 35 ms) so note releases stay full after attacks.
+    envMidFastL.init(fs, 0.8f, 28.0f);
+    envMidFastR.init(fs, 0.8f, 28.0f);
+    envMidSlowL.init(fs, 16.0f, 35.0f);
+    envMidSlowR.init(fs, 16.0f, 35.0f);
 
+    // High band: smooth transient taper (0.8 ms / 25 ms) and quick-recovering
+    // harshness detector (14 ms / 32 ms) to preserve note and cymbal tails.
     envHighFastL.init(fs, 0.8f, 25.0f);
     envHighFastR.init(fs, 0.8f, 25.0f);
-
-    envHighL.init(fs, 3.0f, 50.0f);
-    envHighR.init(fs, 3.0f, 50.0f);
+    envHighL.init(fs, 14.0f, 32.0f);
+    envHighR.init(fs, 14.0f, 32.0f);
 
     ambienceEngine.init(fs);
 
@@ -290,15 +295,18 @@ float Chipgoodizer::processLowBand(float lowLeft, float lowRight)
     const float lowFastEnv = envLowFast.process(lowSine);
     const float lowSlowEnv = envLowSlow.process(lowSine);
 
-    constexpr float kThreshLowUp = 0.12f;
+    // Upward density across the normal bass decay range keeps rubbery tails full.
+    constexpr float kThreshLowUp = 0.26f;
     float lowUpGain = 1.0f;
     if (lowSlowEnv > 1e-4f && lowSlowEnv < kThreshLowUp)
-        lowUpGain = std::min(lowUpCeiling, std::pow(kThreshLowUp / lowSlowEnv, 0.30f));
+        lowUpGain = std::min(lowUpCeiling, std::pow(kThreshLowUp / lowSlowEnv, 0.28f));
 
-    constexpr float kThreshLowDown = 0.40f;
+    // High safety threshold (0.72) avoids post-attack downward ducking on normal
+    // kick and bass note tails; odd-symmetric tanh handles musical peak rounding.
+    constexpr float kThreshLowDown = 0.72f;
     float lowDownGain = 1.0f;
-    if (lowFastEnv > kThreshLowDown)
-        lowDownGain = std::pow(kThreshLowDown / lowFastEnv, 0.60f);
+    if (lowSlowEnv > kThreshLowDown)
+        lowDownGain = std::pow(kThreshLowDown / lowSlowEnv, 0.25f);
 
     // Subtle, deadzoned kick transient lift: triggers only on sharp hits so
     // melodic bass note tails never feel ducked after the attack.
@@ -329,15 +337,27 @@ void Chipgoodizer::processMidBand(float &left, float &right)
     const float punchL = 1.0f + 0.42f * config.punch * std::max(0.0f, ratioL - 0.36f);
     const float punchR = 1.0f + 0.42f * config.punch * std::max(0.0f, ratioR - 0.36f);
 
-    constexpr float kMidThresh = 0.22f;
-    const float compExponent = 0.35f * config.deharsh;
+    // Upward sustain support across the musical decay range keeps note tails
+    // full and commercial-sounding without pumping.
+    constexpr float kThreshMidUp = 0.24f;
+    const float upL = (slowL > 1e-4f && slowL < kThreshMidUp)
+                          ? std::min(1.36f, std::pow(kThreshMidUp / slowL, 0.24f))
+                          : 1.0f;
+    const float upR = (slowR > 1e-4f && slowR < kThreshMidUp)
+                          ? std::min(1.36f, std::pow(kThreshMidUp / slowR, 0.24f))
+                          : 1.0f;
+
+    // High threshold and fast 35 ms release tame only loud sustained square
+    // leads without holding down normal note decays.
+    constexpr float kMidThresh = 0.38f;
+    const float compExponent = 0.18f * config.deharsh;
     const float bodyL = (slowL > kMidThresh) ? std::pow(kMidThresh / slowL, compExponent) : 1.0f;
     const float bodyR = (slowR > kMidThresh) ? std::pow(kMidThresh / slowR, compExponent) : 1.0f;
 
     // Gentle saturation on the sustained body, then transient punch on top
     // so snare/drum snap is never shaved off by mid-band saturation.
-    const float satL = std::tanh(1.06f * (left * bodyL)) / 1.06f;
-    const float satR = std::tanh(1.06f * (right * bodyR)) / 1.06f;
+    const float satL = std::tanh(1.06f * (left * upL * bodyL)) / 1.06f;
+    const float satR = std::tanh(1.06f * (right * upR * bodyR)) / 1.06f;
 
     left = satL * punchL;
     right = satR * punchR;
@@ -350,29 +370,32 @@ void Chipgoodizer::processHighBand(float &left, float &right)
 
     const float fastL = envHighFastL.process(left);
     const float fastR = envHighFastR.process(right);
-    const float highEnvL = envHighL.process(left);
-    const float highEnvR = envHighR.process(right);
+    const float slowL = envHighL.process(left);
+    const float slowR = envHighR.process(right);
 
     // Subtle, deadzoned high-band snap for crisp snare/hat hits without tail dip.
-    const float ratioL = std::max(0.0f, fastL - highEnvL) / (fastL + 1e-3f);
-    const float ratioR = std::max(0.0f, fastR - highEnvR) / (fastR + 1e-3f);
+    const float ratioL = std::max(0.0f, fastL - slowL) / (fastL + 1e-3f);
+    const float ratioR = std::max(0.0f, fastR - slowR) / (fastR + 1e-3f);
     const float punchL = 1.0f + 0.40f * config.punch * std::max(0.0f, ratioL - 0.36f);
     const float punchR = 1.0f + 0.40f * config.punch * std::max(0.0f, ratioR - 0.36f);
 
-    constexpr float kThreshHighUp = 0.05f;
-    const float highUpGainL = (highEnvL < kThreshHighUp && highEnvL > 1e-4f)
-                                  ? std::min(1.4f, std::pow(kThreshHighUp / highEnvL, 0.25f * config.air))
+    // Upward air sheen across the decay range preserves shimmer and note tails.
+    constexpr float kThreshHighUp = 0.11f;
+    const float highUpGainL = (slowL < kThreshHighUp && slowL > 1e-4f)
+                                  ? std::min(1.34f, std::pow(kThreshHighUp / slowL, 0.22f * config.air))
                                   : 1.0f;
-    const float highUpGainR = (highEnvR < kThreshHighUp && highEnvR > 1e-4f)
-                                  ? std::min(1.4f, std::pow(kThreshHighUp / highEnvR, 0.25f * config.air))
+    const float highUpGainR = (slowR < kThreshHighUp && slowR > 1e-4f)
+                                  ? std::min(1.34f, std::pow(kThreshHighUp / slowR, 0.22f * config.air))
                                   : 1.0f;
 
-    constexpr float kThreshHighDown = 0.16f;
-    const float highDownGainL = (highEnvL > kThreshHighDown)
-                                    ? std::pow(kThreshHighDown / highEnvL, 0.50f * config.deharsh)
+    // Quick-recovering (32 ms) high-band control lets snare/hat attacks and
+    // note tails breathe while taming sustained harsh square-wave harmonics.
+    constexpr float kThreshHighDown = 0.30f;
+    const float highDownGainL = (slowL > kThreshHighDown)
+                                    ? std::pow(kThreshHighDown / slowL, 0.28f * config.deharsh)
                                     : 1.0f;
-    const float highDownGainR = (highEnvR > kThreshHighDown)
-                                    ? std::pow(kThreshHighDown / highEnvR, 0.50f * config.deharsh)
+    const float highDownGainR = (slowR > kThreshHighDown)
+                                    ? std::pow(kThreshHighDown / slowR, 0.28f * config.deharsh)
                                     : 1.0f;
 
     // No un-oversampled tanh here: nonlinear waveshaping above 3.8 kHz folds
