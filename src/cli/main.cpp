@@ -206,23 +206,51 @@ int main(int argc, char **argv)
         }
     }
 
-    std::vector<float> inL;
-    std::vector<float> inR;
-    float sampleRate = 44100.0f;
-    if (!chipgoodizer::io::loadWav(inPath, inL, inR, sampleRate))
+    chipgoodizer::io::WavReader reader;
+    if (!reader.open(inPath))
     {
         std::cerr << "Failed to read input audio file: " << inPath << "\n";
         return 1;
     }
 
     Chipgoodizer processor;
-    processor.init(sampleRate, cfg);
+    processor.init(reader.sampleRate(), cfg);
 
-    std::vector<float> outL(inL.size());
-    std::vector<float> outR(inR.size());
-    processor.process(inL.data(), inR.data(), outL.data(), outR.data(), inL.size());
+    chipgoodizer::io::WavWriter writer;
+    if (!writer.open(outPath, reader.sampleRate()))
+    {
+        std::cerr << "Failed to write output audio file: " << outPath << "\n";
+        return 1;
+    }
 
-    if (!chipgoodizer::io::writeWav24(outPath, outL, outR, sampleRate))
+    // Blocks, so a long render stays out of memory.
+    constexpr size_t kBlockFrames = 8192;
+    std::vector<float> inL;
+    std::vector<float> inR;
+    std::vector<float> outL(kBlockFrames);
+    std::vector<float> outR(kBlockFrames);
+
+    while (true)
+    {
+        const size_t frames = reader.read(inL, inR, kBlockFrames);
+        if (frames == 0)
+            break;
+
+        processor.process(inL.data(), inR.data(), outL.data(), outR.data(), frames);
+        if (!writer.write(outL, outR, frames))
+        {
+            std::cerr << "Failed to write output audio file: " << outPath << "\n";
+            return 1;
+        }
+    }
+
+    if (reader.failed())
+    {
+        std::cerr << "Truncated input audio file: " << inPath << "\n";
+        return 1;
+    }
+
+    if (!writer.close())
     {
         std::cerr << "Failed to write output audio file: " << outPath << "\n";
         return 1;
