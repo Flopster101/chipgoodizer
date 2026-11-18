@@ -4,6 +4,7 @@
 #include "chipgoodizer/Params.hpp"
 #include "chipgoodizer/io/WavFile.hpp"
 
+#include <cerrno>
 #include <cmath>
 #include <cstdlib>
 #include <iomanip>
@@ -19,6 +20,22 @@ using chipgoodizer::ChipgoodizerConfig;
 using chipgoodizer::ParamId;
 using chipgoodizer::ParamSpec;
 using chipgoodizer::ParamType;
+
+// std::stof throws on garbage and accepts "12abc"; strtof does neither.
+bool parseNumber(const char *text, float &out)
+{
+    if (!text || *text == '\0')
+        return false;
+
+    errno = 0;
+    char *end = nullptr;
+    const float value = std::strtof(text, &end);
+    if (end == text || *end != '\0' || errno == ERANGE || !std::isfinite(value))
+        return false;
+
+    out = value;
+    return true;
+}
 
 void printUsage()
 {
@@ -169,7 +186,13 @@ int main(int argc, char **argv)
                 std::cerr << "Missing value for " << arg << "\n";
                 return 1;
             }
-            const float value = std::stof(argv[++i]);
+            const char *text = argv[++i];
+            float value = 0.0f;
+            if (!parseNumber(text, value))
+            {
+                std::cerr << "Invalid value for " << arg << ": " << text << "\n";
+                return 1;
+            }
             if (!setNumericParam(cfg, arg.substr(2), value))
             {
                 std::cerr << "Unknown option: " << arg << "\n";
