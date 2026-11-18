@@ -8,7 +8,9 @@
 #include "dsp/StereoAmbience.hpp"
 #include "dsp/SoftClip.hpp"
 
+#include <atomic>
 #include <cstddef>
+#include <cstdint>
 
 namespace chipgoodizer
 {
@@ -101,7 +103,11 @@ public:
     Chipgoodizer() = default;
 
     void init(float sampleRate, const ChipgoodizerConfig &cfg = {});
+
+    // Safe from any thread; picked up at the next sample.
     void setConfig(const ChipgoodizerConfig &cfg);
+
+    // Audio-thread view of the settings currently in use.
     const ChipgoodizerConfig &getConfig() const { return config; }
     void reset();
 
@@ -111,9 +117,15 @@ public:
 
 private:
     void updateFilters();
+    void applyRequestedConfig();
 
     float fs{44100.0f};
     ChipgoodizerConfig config;
+
+    // Seqlock handoff from the writer to the audio thread.
+    ChipgoodizerConfig requestedConfig;
+    std::atomic<uint32_t> requestSeq{0};
+    uint32_t appliedSeq{0};
 
     // Derived gains, refreshed by updateFilters() so the audio path stays free
     // of per-sample pow() calls.

@@ -1,12 +1,48 @@
 #include "chipgoodizer/Chipgoodizer.hpp"
 
+#if defined(__x86_64__) || defined(__i386__) || defined(_M_X64) || defined(_M_IX86)
+#include <xmmintrin.h>
+#elif defined(__aarch64__) || defined(_M_ARM64)
+#include <cstdint>
+#endif
+
 namespace chipgoodizer
 {
+
+namespace
+{
+
+constexpr int kConfigRetries = 4;
+
+// Filter state decays into denormals on quiet passages, where each following
+// multiply costs ~100x more.
+void enableDenormalFlushing()
+{
+#if defined(_M_X64) || defined(_M_IX86)
+    _MM_SET_FLUSH_ZERO_MODE(_MM_FLUSH_ZERO_ON);
+    _MM_SET_DENORMALS_ZERO_MODE(_MM_DENORMALS_ZERO_ON);
+#elif defined(__x86_64__) || defined(__i386__)
+    // FTZ | DAZ.
+    _mm_setcsr(_mm_getcsr() | 0x8040u);
+#elif defined(__aarch64__) || defined(_M_ARM64)
+    uint64_t fpcr;
+    __asm__ __volatile__("mrs %0, fpcr" : "=r"(fpcr));
+    // Flush-to-zero.
+    fpcr |= (uint64_t{1} << 24);
+    __asm__ __volatile__("msr fpcr, %0" : : "r"(fpcr));
+#endif
+}
+
+} // namespace
 
 void Chipgoodizer::init(float sampleRate, const ChipgoodizerConfig &cfg)
 {
     fs = sampleRate;
+    enableDenormalFlushing();
+
     config = cfg;
+    requestedConfig = cfg;
+    appliedSeq = requestSeq.load(std::memory_order_acquire);
 
     rotator.init(140.0f, fs);
     slewL.init(0.14f);
@@ -34,16 +70,47 @@ void Chipgoodizer::init(float sampleRate, const ChipgoodizerConfig &cfg)
 
 void Chipgoodizer::setConfig(const ChipgoodizerConfig &cfg)
 {
-    bool xoverChanged = (cfg.xoverLowHz != config.xoverLowHz || cfg.xoverHighHz != config.xoverHighHz);
-    config = cfg;
+    const uint32_t seq = requestSeq.load(std::memory_order_relaxed);
+    // Odd sequence number: a write is in progress.
+    requestSeq.store(seq + 1, std::memory_order_relaxed);
+    std::atomic_thread_fence(std::memory_order_release);
 
-    if (xoverChanged)
+    requestedConfig = cfg;
+
+    requestSeq.store(seq + 2, std::memory_order_release);
+}
+
+void Chipgoodizer::applyRequestedConfig()
+{
+    for (int attempt = 0; attempt < kConfigRetries; ++attempt)
     {
-        xoverL.init(config.xoverLowHz, config.xoverHighHz, fs);
-        xoverR.init(config.xoverLowHz, config.xoverHighHz, fs);
-    }
+        const uint32_t before = requestSeq.load(std::memory_order_acquire);
+        if (before == appliedSeq)
+            return;
+        // Writer is mid-update, try again below.
+        if ((before & 1u) != 0u)
+            continue;
 
-    updateFilters();
+        const ChipgoodizerConfig snapshot = requestedConfig;
+        std::atomic_thread_fence(std::memory_order_acquire);
+
+        if (requestSeq.load(std::memory_order_relaxed) != before)
+            continue;
+
+        const bool xoverChanged = (snapshot.xoverLowHz != config.xoverLowHz ||
+                                   snapshot.xoverHighHz != config.xoverHighHz);
+        config = snapshot;
+
+        if (xoverChanged)
+        {
+            xoverL.init(config.xoverLowHz, config.xoverHighHz, fs);
+            xoverR.init(config.xoverLowHz, config.xoverHighHz, fs);
+        }
+
+        updateFilters();
+        appliedSeq = before;
+        return;
+    }
 }
 
 void Chipgoodizer::updateFilters()
@@ -134,6 +201,9 @@ void Chipgoodizer::reset()
 
 void Chipgoodizer::processStereo(float inL, float inR, float &outL, float &outR)
 {
+    if (requestSeq.load(std::memory_order_relaxed) != appliedSeq)
+        applyRequestedConfig();
+
     float rotL = inL;
     float rotR = inR;
     if (config.phaseRotation)
@@ -274,6 +344,8 @@ void Chipgoodizer::processStereo(float inL, float inR, float &outL, float &outR)
 
 void Chipgoodizer::process(const float *inL, const float *inR, float *outL, float *outR, size_t numFrames)
 {
+    enableDenormalFlushing();
+
     for (size_t i = 0; i < numFrames; ++i)
     {
         processStereo(inL[i], inR[i], outL[i], outR[i]);
@@ -282,6 +354,8 @@ void Chipgoodizer::process(const float *inL, const float *inR, float *outL, floa
 
 void Chipgoodizer::processInterleaved(float *interleavedStereo, size_t numFrames)
 {
+    enableDenormalFlushing();
+
     for (size_t i = 0; i < numFrames; ++i)
     {
         float outL, outR;

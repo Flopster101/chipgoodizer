@@ -22,26 +22,20 @@ struct cg_effect
             values[i].store(chipgoodizer::getParam(defaults, static_cast<ParamId>(i)), std::memory_order_relaxed);
     }
 
-    void applyPending()
+    ChipgoodizerConfig buildConfig() const
     {
-        const unsigned current = version.load(std::memory_order_acquire);
-        if (current == appliedVersion)
-            return;
-
-        ChipgoodizerConfig cfg = config;
+        ChipgoodizerConfig cfg;
         for (int i = 0; i < chipgoodizer::kParamCount; ++i)
             chipgoodizer::setParam(cfg, static_cast<ParamId>(i), values[i].load(std::memory_order_relaxed));
+        return cfg;
+    }
 
-        config = cfg;
-        dsp.setConfig(config);
-        appliedVersion = current;
+    void publish()
+    {
+        dsp.setConfig(buildConfig());
     }
 
     std::atomic<float> values[chipgoodizer::kParamCount];
-    std::atomic<unsigned> version{1};
-    unsigned appliedVersion{0};
-
-    ChipgoodizerConfig config = ChipgoodizerConfig::getPreset(Preset::Commercial);
     Chipgoodizer dsp;
 };
 
@@ -68,14 +62,14 @@ void setParam(cg_effect *effect, int index, float value)
         value = spec->maxValue;
 
     effect->values[index].store(value, std::memory_order_relaxed);
-    effect->version.fetch_add(1, std::memory_order_release);
+    effect->publish();
 }
 
 void loadPreset(cg_effect *effect, const ChipgoodizerConfig &cfg)
 {
     for (int i = 0; i < chipgoodizer::kParamCount; ++i)
         effect->values[i].store(chipgoodizer::getParam(cfg, static_cast<ParamId>(i)), std::memory_order_relaxed);
-    effect->version.fetch_add(1, std::memory_order_release);
+    effect->publish();
 }
 
 } // namespace
@@ -99,9 +93,7 @@ void cg_prepare(cg_effect *effect, double sample_rate, int channels)
         return;
 
     (void)channels;
-    effect->applyPending();
-    effect->dsp.init(static_cast<float>(sample_rate), effect->config);
-    effect->appliedVersion = effect->version.load(std::memory_order_acquire);
+    effect->dsp.init(static_cast<float>(sample_rate), effect->buildConfig());
 }
 
 void cg_reset(cg_effect *effect)
@@ -115,8 +107,6 @@ void cg_process_interleaved(cg_effect *effect, float *interleaved, int frames, i
 {
     if (!effect || !interleaved || frames <= 0 || channels <= 0)
         return;
-
-    effect->applyPending();
 
     if (channels == 1)
     {
