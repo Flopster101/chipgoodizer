@@ -85,7 +85,7 @@ public:
 
         float b0_raw = A * ((A + 1.0f) + (A - 1.0f) * cos_w0 + 2.0f * std::sqrt(A) * alpha);
         float b1_raw = -2.0f * A * ((A - 1.0f) + (A + 1.0f) * cos_w0);
-        float b2_raw = A * ((A + 1.0f) - (A - 1.0f) * cos_w0 - 2.0f * std::sqrt(A) * alpha);
+        float b2_raw = A * ((A + 1.0f) + (A - 1.0f) * cos_w0 - 2.0f * std::sqrt(A) * alpha);
         float a0_raw = (A + 1.0f) - (A - 1.0f) * cos_w0 + 2.0f * std::sqrt(A) * alpha;
         float a1_raw = 2.0f * ((A - 1.0f) - (A + 1.0f) * cos_w0);
         float a2_raw = (A + 1.0f) - (A - 1.0f) * cos_w0 - 2.0f * std::sqrt(A) * alpha;

@@ -428,6 +428,31 @@ void testWavWriterLimit()
 }
 #endif
 
+
+void testHighShelfPassbandFlat()
+{
+    chipgoodizer::Biquad shelf;
+    shelf.setHighShelf(8500.0f, kSampleRate, 5.0f);
+
+    const size_t frames = static_cast<size_t>(kSampleRate) / 4;
+    float inEnergy = 0.0f;
+    float outEnergy = 0.0f;
+    for (size_t i = 0; i < frames; ++i)
+    {
+        const double phase = 2.0 * chipgoodizer::kPi * 500.0 * static_cast<double>(i) / kSampleRate;
+        const float x = static_cast<float>(std::sin(phase));
+        const float y = shelf.process(x);
+        if (i >= frames / 2)
+        {
+            inEnergy += x * x;
+            outEnergy += y * y;
+        }
+    }
+
+    const float gainDb = 10.0f * std::log10(outEnergy / inEnergy);
+    check(std::fabs(gainDb) < 0.05f, "high shelf keeps 500 Hz passband flat within 0.05 dB");
+}
+
 } // namespace
 
 int main()
@@ -437,6 +462,7 @@ int main()
     testSampleRates();
     testParameterClamping();
     testFixedInputHash();
+    testHighShelfPassbandFlat();
 #ifdef CHIPGOODIZER_HAVE_CAPI
     testCApi();
     testConcurrentParameterChanges();
