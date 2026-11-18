@@ -23,11 +23,11 @@ public:
 
     inline float process(float input)
     {
-        float target = std::abs(input);
+        const float target = std::abs(input);
         if (target > env)
-            env = target + attCoef * (env - target);
+            env = attCoef * env + (1.0f - attCoef) * target;
         else
-            env = target + relCoef * (env - target);
+            env = relCoef * env + (1.0f - relCoef) * target;
         return env;
     }
 

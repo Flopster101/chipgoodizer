@@ -118,26 +118,26 @@ void Chipgoodizer::updateFilters()
     eqHighPassL.setHighPass(30.0f, fs, 0.7071f);
     eqHighPassR.setHighPass(30.0f, fs, 0.7071f);
 
-    eqBassWarmthL.setLowShelf(95.0f, fs, 2.6f * config.rubber);
-    eqBassWarmthR.setLowShelf(95.0f, fs, 2.6f * config.rubber);
+    eqBassWarmthL.setLowShelf(95.0f, fs, 2.2f * config.rubber);
+    eqBassWarmthR.setLowShelf(95.0f, fs, 2.2f * config.rubber);
 
-    eqMudCutL.setPeaking(240.0f, fs, -1.8f * (0.5f + 0.5f * config.rubber), 1.2f);
-    eqMudCutR.setPeaking(240.0f, fs, -1.8f * (0.5f + 0.5f * config.rubber), 1.2f);
+    eqMudCutL.setPeaking(240.0f, fs, -1.8f, 1.2f);
+    eqMudCutR.setPeaking(240.0f, fs, -1.8f, 1.2f);
 
-    eqLeadBodyL.setPeaking(420.0f, fs, 2.5f * config.warmth, 1.0f);
-    eqLeadBodyR.setPeaking(420.0f, fs, 2.5f * config.warmth, 1.0f);
+    eqLeadBodyL.setPeaking(420.0f, fs, 2.0f * config.warmth, 1.0f);
+    eqLeadBodyR.setPeaking(420.0f, fs, 2.0f * config.warmth, 1.0f);
 
-    eqTameHarshL.setPeaking(1750.0f, fs, -5.6f * config.deharsh, 1.4f);
-    eqTameHarshR.setPeaking(1750.0f, fs, -5.6f * config.deharsh, 1.4f);
+    eqTameHarshL.setPeaking(1750.0f, fs, -4.8f * config.deharsh, 1.4f);
+    eqTameHarshR.setPeaking(1750.0f, fs, -4.8f * config.deharsh, 1.4f);
 
-    eqLeadAirL.setPeaking(3200.0f, fs, 3.5f * config.air, 1.2f);
-    eqLeadAirR.setPeaking(3200.0f, fs, 3.5f * config.air, 1.2f);
+    eqLeadAirL.setPeaking(3200.0f, fs, 3.2f * config.air, 1.2f);
+    eqLeadAirR.setPeaking(3200.0f, fs, 3.2f * config.air, 1.2f);
 
-    eqShelfAirL.setHighShelf(8500.0f, fs, 3.5f * config.air);
-    eqShelfAirR.setHighShelf(8500.0f, fs, 3.5f * config.air);
+    eqShelfAirL.setHighShelf(8500.0f, fs, 3.0f * config.air);
+    eqShelfAirR.setHighShelf(8500.0f, fs, 3.0f * config.air);
 
-    lowSubShelf.setLowShelf(95.0f, fs, 4.5f * config.rubber);
-    lowBodyPeaking.setPeaking(190.0f, fs, 2.6f * config.rubber, 1.2f);
+    lowSubShelf.setLowShelf(95.0f, fs, 4.0f * config.rubber);
+    lowBodyPeaking.setPeaking(190.0f, fs, 2.2f * config.rubber, 1.2f);
     lowSmooth.setLowPass(480.0f, fs, 0.707f);
 
     lowPreGain = std::pow(10.0f, (2.5f * config.rubber) / 20.0f);
@@ -275,7 +275,7 @@ void Chipgoodizer::processStereo(float inL, float inR, float &outL, float &outR)
     float punchR = 1.0f + 0.60f * config.punch * (transR / (fastR + 1e-4f));
 
     float midThresh = 0.22f;
-    float compExponent = 0.35f * (0.5f + 0.5f * config.deharsh);
+    float compExponent = 0.35f * config.deharsh;
     float bodyL = (slowL > midThresh) ? std::pow(midThresh / slowL, compExponent) : 1.0f;
     float bodyR = (slowR > midThresh) ? std::pow(midThresh / slowR, compExponent) : 1.0f;
 
@@ -297,8 +297,8 @@ void Chipgoodizer::processStereo(float inL, float inR, float &outL, float &outR)
     float highUpGainR = (highEnvR < threshHighUp && highEnvR > 1e-4f) ? std::min(1.4f, std::pow(threshHighUp / highEnvR, 0.25f * config.air)) : 1.0f;
 
     float threshHighDown = 0.16f;
-    float highDownGainL = (highEnvL > threshHighDown) ? std::pow(threshHighDown / highEnvL, 0.55f * config.deharsh) : 1.0f;
-    float highDownGainR = (highEnvR > threshHighDown) ? std::pow(threshHighDown / highEnvR, 0.55f * config.deharsh) : 1.0f;
+    float highDownGainL = (highEnvL > threshHighDown) ? std::pow(threshHighDown / highEnvL, 0.50f * config.deharsh) : 1.0f;
+    float highDownGainR = (highEnvR > threshHighDown) ? std::pow(threshHighDown / highEnvR, 0.50f * config.deharsh) : 1.0f;
 
     float highPostGain = 1.06f;
     float procHighL = highSmoothL.process(highShelfL.process(highL * highUpGainL * highDownGainL)) * highPostGain;
