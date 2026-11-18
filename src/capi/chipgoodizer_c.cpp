@@ -111,6 +111,23 @@ void cg_process_interleaved(cg_effect *effect, float *interleaved, int frames, i
     effect->dsp.processInterleaved(interleaved, static_cast<size_t>(frames), channels);
 }
 
+int cg_preset_count(void)
+{
+    return chipgoodizer::kPresetCount;
+}
+
+const char *cg_preset_id(int index)
+{
+    const chipgoodizer::PresetSpec *spec = chipgoodizer::presetSpecAt(index);
+    return spec ? spec->id : nullptr;
+}
+
+const char *cg_preset_label(int index)
+{
+    const chipgoodizer::PresetSpec *spec = chipgoodizer::presetSpecAt(index);
+    return spec ? spec->label : nullptr;
+}
+
 int cg_param_count(void)
 {
     return chipgoodizer::kParamCount;

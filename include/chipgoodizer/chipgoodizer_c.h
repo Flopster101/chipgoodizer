@@ -40,6 +40,11 @@ typedef enum cg_preset
     CG_PRESET_CLUB = 3
 } cg_preset;
 
+/* Presets write every parameter. Index order is stable. */
+int cg_preset_count(void);
+const char *cg_preset_id(int index);    /* stable spelling for persistence, NULL when out of range */
+const char *cg_preset_label(int index); /* display name, NULL when out of range */
+
 /* Creates an instance with the commercial preset loaded. Free with cg_destroy. */
 cg_effect *cg_create(void);
 void cg_destroy(cg_effect *effect);

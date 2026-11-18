@@ -213,6 +213,7 @@ void testFixedInputHash()
     constexpr uint64_t kExpectedHash = 0xd26e651a726bda1bull;
     std::printf("fixed-input hash: 0x%016llx (expected 0x%016llx)\n",
                 static_cast<unsigned long long>(hash), static_cast<unsigned long long>(kExpectedHash));
+
     check(hash == kExpectedHash, "fixed input hashes to the expected value");
 }
 
@@ -305,6 +306,41 @@ void testConcurrentParameterChanges()
 }
 #endif
 
+#ifdef CHIPGOODIZER_HAVE_CAPI
+// The list a host builds its preset picker from.
+void testPresetList()
+{
+    check(cg_preset_count() > 0, "C ABI reports at least one preset");
+    check(cg_preset_id(-1) == nullptr, "preset index below zero has no id");
+    check(cg_preset_id(cg_preset_count()) == nullptr, "preset index past the end has no id");
+
+    cg_effect *effect = cg_create();
+    cg_prepare(effect, kSampleRate, 2);
+
+    for (int i = 0; i < cg_preset_count(); ++i)
+    {
+        const char *id = cg_preset_id(i);
+        const char *label = cg_preset_label(i);
+        check(id != nullptr && id[0] != '\0', "every preset has an id");
+        check(label != nullptr && label[0] != '\0', "every preset has a label");
+
+        cg_apply_preset(effect, static_cast<cg_preset>(i));
+        bool finite = true;
+        for (int p = 0; p < cg_param_count(); ++p)
+            finite = finite && std::isfinite(cg_get_param(effect, p));
+        check(finite, "applying a preset leaves every parameter finite");
+    }
+
+    cg_apply_preset(effect, CG_PRESET_CLUB);
+    const int driveIndex = cg_param_index("drive");
+    check(cg_get_param(effect, driveIndex) > 0.0f, "the club preset sets drive");
+
+    cg_apply_preset(effect, CG_PRESET_COMMERCIAL);
+    check(cg_get_param(effect, driveIndex) == 0.0f, "the commercial preset clears drive");
+    cg_destroy(effect);
+}
+#endif
+
 #ifdef CHIPGOODIZER_HAVE_IO
 // Exercises both halves: the writer patches its header, the reader walks it.
 void testWavRoundTrip()
@@ -390,6 +426,7 @@ int main()
 #ifdef CHIPGOODIZER_HAVE_CAPI
     testCApi();
     testConcurrentParameterChanges();
+    testPresetList();
 #endif
 #ifdef CHIPGOODIZER_HAVE_IO
     testWavRoundTrip();

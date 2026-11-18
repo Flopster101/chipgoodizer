@@ -20,6 +20,7 @@ using chipgoodizer::ChipgoodizerConfig;
 using chipgoodizer::ParamId;
 using chipgoodizer::ParamSpec;
 using chipgoodizer::ParamType;
+using chipgoodizer::PresetSpec;
 
 // std::stof throws on garbage and accepts "12abc"; strtof does neither.
 bool parseNumber(const char *text, float &out)
@@ -101,16 +102,13 @@ void printParameters()
 
 bool applyPreset(const std::string &name, ChipgoodizerConfig &cfg)
 {
-    if (name == "commercial")
-        cfg = ChipgoodizerConfig::getPreset(chipgoodizer::Preset::Commercial);
-    else if (name == "scope-safe" || name == "scopesafe")
-        cfg = ChipgoodizerConfig::getPreset(chipgoodizer::Preset::ScopeSafe);
-    else if (name == "warm")
-        cfg = ChipgoodizerConfig::getPreset(chipgoodizer::Preset::WarmChiptune);
-    else if (name == "club")
-        cfg = ChipgoodizerConfig::getPreset(chipgoodizer::Preset::PunchyClub);
-    else
+    // "scopesafe" is the historical spelling of the scope-safe preset.
+    const std::string id = (name == "scopesafe") ? "scope-safe" : name;
+    const PresetSpec *spec = chipgoodizer::findPresetSpec(id.c_str());
+    if (!spec)
         return false;
+
+    cfg = ChipgoodizerConfig::getPreset(spec->preset);
     return true;
 }
 

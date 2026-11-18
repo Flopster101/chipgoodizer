@@ -4,6 +4,7 @@
 
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <cstring>
 
 namespace chipgoodizer
@@ -64,6 +65,41 @@ inline const ParamSpec kParamSpecs[kParamCount] = {
     {"xoverHigh", "High X-Over (Hz)", ParamType::Float, 2500.0f, 6000.0f, 3800.0f, 0.0f},
     {"phaseRotation", "Kick Phase Rotation", ParamType::Bool, 0.0f, 1.0f, 1.0f, 1.0f},
 };
+
+struct PresetSpec
+{
+    Preset preset;
+    const char *id;
+    const char *label;
+};
+
+inline constexpr PresetSpec kPresetSpecs[] = {
+    {Preset::Commercial, "commercial", "Commercial"},
+    {Preset::ScopeSafe, "scope-safe", "Scope Safe"},
+    {Preset::WarmChiptune, "warm", "Warm Chiptune"},
+    {Preset::PunchyClub, "club", "Punchy Club"},
+};
+
+constexpr int kPresetCount = static_cast<int>(sizeof(kPresetSpecs) / sizeof(kPresetSpecs[0]));
+
+inline const PresetSpec *presetSpecAt(int index)
+{
+    if (index < 0 || index >= kPresetCount)
+        return nullptr;
+    return &kPresetSpecs[index];
+}
+
+inline const PresetSpec *findPresetSpec(const char *id)
+{
+    if (!id)
+        return nullptr;
+    for (int i = 0; i < kPresetCount; ++i)
+    {
+        if (std::strcmp(kPresetSpecs[i].id, id) == 0)
+            return &kPresetSpecs[i];
+    }
+    return nullptr;
+}
 
 inline const ParamSpec *paramSpec(ParamId id)
 {
