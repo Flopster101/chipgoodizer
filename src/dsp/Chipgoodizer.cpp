@@ -14,6 +14,9 @@ namespace
 
 constexpr int kConfigRetries = 4;
 
+// 0.14 per sample at 48 kHz, held as a slope so other rates match.
+constexpr float kSlewPerSecond = 0.14f * 48000.0f;
+
 // Filter state decays into denormals on quiet passages, where each following
 // multiply costs ~100x more.
 void enableDenormalFlushing()
@@ -45,8 +48,9 @@ void Chipgoodizer::init(float sampleRate, const ChipgoodizerConfig &cfg)
     appliedSeq = requestSeq.load(std::memory_order_acquire);
 
     rotator.init(140.0f, fs);
-    slewL.init(0.14f);
-    slewR.init(0.14f);
+    const float maxSlew = kSlewPerSecond / sampleRate;
+    slewL.init(maxSlew);
+    slewR.init(maxSlew);
 
     xoverL.init(config.xoverLowHz, config.xoverHighHz, fs);
     xoverR.init(config.xoverLowHz, config.xoverHighHz, fs);

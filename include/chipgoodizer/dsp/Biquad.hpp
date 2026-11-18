@@ -2,6 +2,7 @@
 
 #include "MathConstants.hpp"
 
+#include <algorithm>
 #include <cmath>
 
 namespace chipgoodizer
@@ -21,6 +22,8 @@ public:
 
     void setLowPass(float fc, float fs, float Q = 0.70710678f)
     {
+        fc = clampToNyquist(fc, fs);
+
         float w0 = 2.0f * kPi * fc / fs;
         float cos_w0 = std::cos(w0);
         float alpha = std::sin(w0) / (2.0f * Q);
@@ -35,6 +38,8 @@ public:
 
     void setHighPass(float fc, float fs, float Q = 0.70710678f)
     {
+        fc = clampToNyquist(fc, fs);
+
         float w0 = 2.0f * kPi * fc / fs;
         float cos_w0 = std::cos(w0);
         float alpha = std::sin(w0) / (2.0f * Q);
@@ -49,6 +54,8 @@ public:
 
     void setLowShelf(float fc, float fs, float gainDb, float S = 1.0f)
     {
+        fc = clampShelf(fc, fs);
+
         float A = std::pow(10.0f, gainDb / 40.0f);
         float w0 = 2.0f * kPi * fc / fs;
         float cos_w0 = std::cos(w0);
@@ -68,6 +75,8 @@ public:
 
     void setHighShelf(float fc, float fs, float gainDb, float S = 1.0f)
     {
+        fc = clampShelf(fc, fs);
+
         float A = std::pow(10.0f, gainDb / 40.0f);
         float w0 = 2.0f * kPi * fc / fs;
         float cos_w0 = std::cos(w0);
@@ -87,6 +96,8 @@ public:
 
     void setPeaking(float fc, float fs, float gainDb, float Q = 0.70710678f)
     {
+        fc = clampToNyquist(fc, fs);
+
         float A = std::pow(10.0f, gainDb / 40.0f);
         float w0 = 2.0f * kPi * fc / fs;
         float cos_w0 = std::cos(w0);
@@ -120,6 +131,18 @@ public:
     }
 
 private:
+    // Above Nyquist RBJ folds back: 16.5 kHz lands near 1 kHz at 8 kHz.
+    static float clampToNyquist(float fc, float fs)
+    {
+        return std::min(fc, 0.45f * fs);
+    }
+
+    // Shelves degrade sooner: past 0.25 * fs they tilt the wrong way.
+    static float clampShelf(float fc, float fs)
+    {
+        return std::min(fc, 0.25f * fs);
+    }
+
     float b0{1.0f}, b1{0.0f}, b2{0.0f}, a1{0.0f}, a2{0.0f};
     float x1{0.0f}, x2{0.0f}, y1{0.0f}, y2{0.0f};
 };
