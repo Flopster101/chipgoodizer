@@ -453,6 +453,26 @@ void testHighShelfPassbandFlat()
     check(std::fabs(gainDb) < 0.05f, "high shelf keeps 500 Hz passband flat within 0.05 dB");
 }
 
+void testScopeSafePeak()
+{
+    Chipgoodizer dsp;
+    dsp.init(kSampleRate, ChipgoodizerConfig::getPreset(chipgoodizer::Preset::ScopeSafe));
+
+    const size_t frames = static_cast<size_t>(kSampleRate) / 2;
+    float peak = 0.0f;
+    for (size_t i = 0; i < frames; ++i)
+    {
+        const double phase = 2.0 * chipgoodizer::kPi * 110.0 * static_cast<double>(i) / kSampleRate;
+        const float x = 0.95f * static_cast<float>(std::sin(phase));
+        float outL = 0.0f;
+        float outR = 0.0f;
+        dsp.processStereo(x, x, outL, outR);
+        peak = std::max(peak, std::max(std::fabs(outL), std::fabs(outR)));
+    }
+
+    check(peak < 0.50f, "ScopeSafe preset stays below 0.50 peak for blur scope margins");
+}
+
 } // namespace
 
 int main()
@@ -463,6 +483,7 @@ int main()
     testParameterClamping();
     testFixedInputHash();
     testHighShelfPassbandFlat();
+    testScopeSafePeak();
 #ifdef CHIPGOODIZER_HAVE_CAPI
     testCApi();
     testConcurrentParameterChanges();

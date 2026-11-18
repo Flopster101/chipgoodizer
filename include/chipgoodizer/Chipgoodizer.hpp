@@ -64,7 +64,7 @@ struct ChipgoodizerConfig
 
         case Preset::ScopeSafe:
             cfg = getPreset(Preset::Commercial);
-            cfg.ceilingDb = -4.8f;
+            cfg.ceilingDb = -6.2f;
             break;
 
         case Preset::WarmChiptune:
@@ -138,8 +138,8 @@ private:
     float lowPreGain{1.0f};
     float midPreGain{1.0f};
     float highPreGain{1.0f};
-    float masterScale{0.72f};
-    float lowUpCeiling{1.51f};
+    float masterScale{1.0f};
+    float lowUpCeiling{1.36f};
 
     PhaseRotator rotator;
 

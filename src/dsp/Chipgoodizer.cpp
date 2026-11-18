@@ -168,8 +168,10 @@ void Chipgoodizer::updateFilters()
     highPreGain = std::pow(10.0f, (2.6f * config.air) / 20.0f);
     driveLin = std::pow(10.0f, config.inputDriveDb / 20.0f);
     ceilingLin = std::pow(10.0f, config.ceilingDb / 20.0f);
-    masterScale = std::pow(10.0f, -2.8f / 20.0f);
-    lowUpCeiling = 1.0f + 0.6f * config.rubber;
+    // Calibrated master trim: matches commercial loudness without losing volume
+    // relative to the dry tracker render, while keeping clean headroom.
+    masterScale = std::pow(10.0f, 1.4f / 20.0f);
+    lowUpCeiling = 1.0f + 0.62f * config.rubber;
 
     highShelfL.setHighShelf(6500.0f, fs, 1.3f * config.air);
     highShelfR.setHighShelf(6500.0f, fs, 1.3f * config.air);
@@ -261,8 +263,8 @@ void Chipgoodizer::processStereo(float inL, float inR, float &outL, float &outR)
     const float mixL = (1.0f - config.amount) * (drivenL * masterScale) + config.amount * wetL;
     const float mixR = (1.0f - config.amount) * (drivenR * masterScale) + config.amount * wetR;
 
-    outL = softClip(mixL, 0.78f) * ceilingLin;
-    outR = softClip(mixR, 0.78f) * ceilingLin;
+    outL = softClip(mixL, 0.86f) * ceilingLin;
+    outR = softClip(mixR, 0.86f) * ceilingLin;
 }
 
 void Chipgoodizer::applyPreEq(float &left, float &right)
@@ -415,7 +417,7 @@ void Chipgoodizer::applyAmbienceAndWidth(float &left, float &right)
 
     const float midChan = 0.5f * (spatialL + spatialR);
     float sideChan = 0.5f * (spatialL - spatialR);
-    sideChan *= 1.0f + 0.35f * config.width;
+    sideChan *= 1.0f + 0.72f * config.width;
 
     left = midChan + sideChan;
     right = midChan - sideChan;
