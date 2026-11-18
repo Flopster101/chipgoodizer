@@ -14,8 +14,9 @@ namespace
 
 constexpr int kConfigRetries = 4;
 
-// 0.14 per sample at 48 kHz, held as a slope so other rates match.
-constexpr float kSlewPerSecond = 0.14f * 48000.0f;
+// Gentle ultrasonic step guard (~0.60 per sample at 48 kHz) so drum attack
+// slopes pass intact while extreme 1-sample digital glitches stay bounded.
+constexpr float kSlewPerSecond = 0.60f * 48000.0f;
 
 // Filter state decays into denormals on quiet passages, where each following
 // multiply costs ~100x more.
@@ -62,6 +63,9 @@ void Chipgoodizer::init(float sampleRate, const ChipgoodizerConfig &cfg)
     envMidFastR.init(fs, 1.0f, 15.0f);
     envMidSlowL.init(fs, 25.0f, 80.0f);
     envMidSlowR.init(fs, 25.0f, 80.0f);
+
+    envHighFastL.init(fs, 0.8f, 25.0f);
+    envHighFastR.init(fs, 0.8f, 25.0f);
 
     envHighL.init(fs, 3.0f, 50.0f);
     envHighR.init(fs, 3.0f, 50.0f);
@@ -203,6 +207,8 @@ void Chipgoodizer::reset()
     envMidSlowL.reset();
     envMidSlowR.reset();
 
+    envHighFastL.reset();
+    envHighFastR.reset();
     envHighL.reset();
     envHighR.reset();
     highShelfL.reset();
@@ -294,8 +300,16 @@ float Chipgoodizer::processLowBand(float lowLeft, float lowRight)
     if (lowFastEnv > kThreshLowDown)
         lowDownGain = std::pow(kThreshLowDown / lowFastEnv, 0.60f);
 
-    float procLow = lowSine * lowUpGain * lowDownGain * 1.06f;
-    return std::tanh(1.10f * procLow) / 1.10f;
+    // Subtle, deadzoned kick transient lift: triggers only on sharp hits so
+    // melodic bass note tails never feel ducked after the attack.
+    const float lowRatio = std::max(0.0f, lowFastEnv - lowSlowEnv) / (lowFastEnv + 1e-3f);
+    const float lowPunch = 1.0f + 0.25f * config.punch * std::max(0.0f, lowRatio - 0.34f);
+
+    // Warm odd-symmetric rubbery saturation on the body, with kick punch applied
+    // after saturation so the transient crest stays sharp.
+    float body = lowSine * lowUpGain * lowDownGain;
+    body = std::tanh(1.18f * body) / 1.18f;
+    return body * lowPunch;
 }
 
 void Chipgoodizer::processMidBand(float &left, float &right)
@@ -308,22 +322,25 @@ void Chipgoodizer::processMidBand(float &left, float &right)
     const float slowL = envMidSlowL.process(left);
     const float slowR = envMidSlowR.process(right);
 
-    const float transL = std::max(0.0f, fastL - slowL);
-    const float transR = std::max(0.0f, fastR - slowR);
-
-    const float punchL = 1.0f + 0.60f * config.punch * (transL / (fastL + 1e-4f));
-    const float punchR = 1.0f + 0.60f * config.punch * (transR / (fastR + 1e-4f));
+    // Subtle, deadzoned transient lift: fires only on sharp snare/percussion
+    // onsets so melodic notes do not spike and drop into a ducked tail.
+    const float ratioL = std::max(0.0f, fastL - slowL) / (fastL + 1e-3f);
+    const float ratioR = std::max(0.0f, fastR - slowR) / (fastR + 1e-3f);
+    const float punchL = 1.0f + 0.42f * config.punch * std::max(0.0f, ratioL - 0.36f);
+    const float punchR = 1.0f + 0.42f * config.punch * std::max(0.0f, ratioR - 0.36f);
 
     constexpr float kMidThresh = 0.22f;
     const float compExponent = 0.35f * config.deharsh;
     const float bodyL = (slowL > kMidThresh) ? std::pow(kMidThresh / slowL, compExponent) : 1.0f;
     const float bodyR = (slowR > kMidThresh) ? std::pow(kMidThresh / slowR, compExponent) : 1.0f;
 
-    float procL = left * punchL * bodyL;
-    float procR = right * punchR * bodyR;
+    // Gentle saturation on the sustained body, then transient punch on top
+    // so snare/drum snap is never shaved off by mid-band saturation.
+    const float satL = std::tanh(1.06f * (left * bodyL)) / 1.06f;
+    const float satR = std::tanh(1.06f * (right * bodyR)) / 1.06f;
 
-    left = std::tanh(1.15f * procL) / 1.15f;
-    right = std::tanh(1.15f * procR) / 1.15f;
+    left = satL * punchL;
+    right = satR * punchR;
 }
 
 void Chipgoodizer::processHighBand(float &left, float &right)
@@ -331,8 +348,16 @@ void Chipgoodizer::processHighBand(float &left, float &right)
     left *= highPreGain;
     right *= highPreGain;
 
+    const float fastL = envHighFastL.process(left);
+    const float fastR = envHighFastR.process(right);
     const float highEnvL = envHighL.process(left);
     const float highEnvR = envHighR.process(right);
+
+    // Subtle, deadzoned high-band snap for crisp snare/hat hits without tail dip.
+    const float ratioL = std::max(0.0f, fastL - highEnvL) / (fastL + 1e-3f);
+    const float ratioR = std::max(0.0f, fastR - highEnvR) / (fastR + 1e-3f);
+    const float punchL = 1.0f + 0.40f * config.punch * std::max(0.0f, ratioL - 0.36f);
+    const float punchR = 1.0f + 0.40f * config.punch * std::max(0.0f, ratioR - 0.36f);
 
     constexpr float kThreshHighUp = 0.05f;
     const float highUpGainL = (highEnvL < kThreshHighUp && highEnvL > 1e-4f)
@@ -352,8 +377,8 @@ void Chipgoodizer::processHighBand(float &left, float &right)
 
     // No un-oversampled tanh here: nonlinear waveshaping above 3.8 kHz folds
     // aliasing harmonics back into the 2-10 kHz presence band as metallic grit.
-    left = highSmoothL.process(highShelfL.process(left * highUpGainL * highDownGainL));
-    right = highSmoothR.process(highShelfR.process(right * highUpGainR * highDownGainR));
+    left = highSmoothL.process(highShelfL.process(left * highUpGainL * highDownGainL * punchL));
+    right = highSmoothR.process(highShelfR.process(right * highUpGainR * highDownGainR * punchR));
 }
 
 void Chipgoodizer::applyAmbienceAndWidth(float &left, float &right)

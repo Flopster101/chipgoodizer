@@ -168,6 +168,8 @@ private:
     EnvelopeFollower envMidSlowL;
     EnvelopeFollower envMidSlowR;
 
+    EnvelopeFollower envHighFastL;
+    EnvelopeFollower envHighFastR;
     EnvelopeFollower envHighL;
     EnvelopeFollower envHighR;
     Biquad highShelfL;
