@@ -34,6 +34,8 @@ add_library(chipgoodizer_dsp STATIC
 
 add_library(chipgoodizer::dsp ALIAS chipgoodizer_dsp)
 
+target_compile_features(chipgoodizer_dsp PUBLIC cxx_std_17)
+
 target_include_directories(chipgoodizer_dsp PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
@@ -57,6 +59,8 @@ if(CHIPGOODIZER_BUILD_CAPI)
 
     add_library(chipgoodizer::capi ALIAS chipgoodizer_capi)
 
+    target_compile_features(chipgoodizer_capi PUBLIC cxx_std_17)
+
     target_link_libraries(chipgoodizer_capi PUBLIC chipgoodizer_dsp)
     set_target_properties(chipgoodizer_capi PROPERTIES
         POSITION_INDEPENDENT_CODE ON
@@ -76,6 +80,8 @@ if(CHIPGOODIZER_BUILD_IO)
     )
 
     add_library(chipgoodizer::io ALIAS chipgoodizer_io)
+
+    target_compile_features(chipgoodizer_io PUBLIC cxx_std_17)
 
     target_include_directories(chipgoodizer_io PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
