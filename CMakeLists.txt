@@ -10,6 +10,14 @@ option(CHIPGOODIZER_BUILD_IO "Build the WAV file I/O helper (chipgoodizer_io)" O
 option(CHIPGOODIZER_BUILD_CLI "Build the offline demo renderer (CLI)" ON)
 option(CHIPGOODIZER_INSTALL "Generate install and CMake package rules" ON)
 
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+    set(CHIPGOODIZER_TESTS_DEFAULT ON)
+else()
+    set(CHIPGOODIZER_TESTS_DEFAULT OFF)
+endif()
+
+option(CHIPGOODIZER_BUILD_TESTS "Build the engine test suite" ${CHIPGOODIZER_TESTS_DEFAULT})
+
 include(GNUInstallDirs)
 
 if(CHIPGOODIZER_BUILD_CLI AND NOT CHIPGOODIZER_BUILD_IO)
@@ -109,6 +117,27 @@ if(CHIPGOODIZER_BUILD_CLI)
     set_target_properties(chipgoodizer_cli PROPERTIES OUTPUT_NAME chipgoodizer)
     set_target_properties(chipgoodizer_cli PROPERTIES EXPORT_NAME cli)
     chipgoodizer_set_warnings(chipgoodizer_cli)
+endif()
+
+# -----------------------------------------------------------------------------
+# Tests: plain executable, no framework, run with ctest.
+# -----------------------------------------------------------------------------
+if(CHIPGOODIZER_BUILD_TESTS)
+    enable_testing()
+
+    add_executable(chipgoodizer_tests
+        tests/chipgoodizer_tests.cpp
+    )
+
+    target_link_libraries(chipgoodizer_tests PRIVATE chipgoodizer_dsp)
+
+    if(CHIPGOODIZER_BUILD_CAPI)
+        target_link_libraries(chipgoodizer_tests PRIVATE chipgoodizer_capi)
+        target_compile_definitions(chipgoodizer_tests PRIVATE CHIPGOODIZER_HAVE_CAPI)
+    endif()
+
+    chipgoodizer_set_warnings(chipgoodizer_tests)
+    add_test(NAME chipgoodizer_tests COMMAND chipgoodizer_tests)
 endif()
 
 # -----------------------------------------------------------------------------
