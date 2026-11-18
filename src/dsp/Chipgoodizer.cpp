@@ -208,142 +208,161 @@ void Chipgoodizer::processStereo(float inL, float inR, float &outL, float &outR)
     if (requestSeq.load(std::memory_order_relaxed) != appliedSeq)
         applyRequestedConfig();
 
-    float rotL = inL;
-    float rotR = inR;
+    float drivenL = inL;
+    float drivenR = inR;
     if (config.phaseRotation)
-        rotator.process(rotL, rotR);
+        rotator.process(drivenL, drivenR);
 
-    float drivenL = rotL * driveLin;
-    float drivenR = rotR * driveLin;
-
-    drivenL = eqHighPassL.process(drivenL);
-    drivenR = eqHighPassR.process(drivenR);
-    drivenL = eqBassWarmthL.process(drivenL);
-    drivenR = eqBassWarmthR.process(drivenR);
-    drivenL = eqMudCutL.process(drivenL);
-    drivenR = eqMudCutR.process(drivenR);
-    drivenL = eqLeadBodyL.process(drivenL);
-    drivenR = eqLeadBodyR.process(drivenR);
-    drivenL = eqTameHarshL.process(drivenL);
-    drivenR = eqTameHarshR.process(drivenR);
-    drivenL = eqLeadAirL.process(drivenL);
-    drivenR = eqLeadAirR.process(drivenR);
-    drivenL = eqShelfAirL.process(drivenL);
-    drivenR = eqShelfAirR.process(drivenR);
+    drivenL *= driveLin;
+    drivenR *= driveLin;
+    applyPreEq(drivenL, drivenR);
 
     float lowL, midL, highL;
     float lowR, midR, highR;
     xoverL.process(drivenL, lowL, midL, highL);
     xoverR.process(drivenR, lowR, midR, highR);
 
-    // Low band (rubbery bass transformation)
-    float lowMono = 0.5f * (lowL + lowR);
-    lowMono *= lowPreGain;
+    const float procLow = processLowBand(lowL, lowR);
+    processMidBand(midL, midR);
+    processHighBand(highL, highR);
 
-    lowMono = lowSubShelf.process(lowMono);
-    lowMono = lowBodyPeaking.process(lowMono);
-    float lowSine = lowSmooth.process(lowMono);
+    float midHighL = midL + highL;
+    float midHighR = midR + highR;
+    applyAmbienceAndWidth(midHighL, midHighR);
 
-    float lowFastEnv = envLowFast.process(lowSine);
-    float lowSlowEnv = envLowSlow.process(lowSine);
-
-    float threshLowUp = 0.12f;
-    float lowUpGain = 1.0f;
-    if (lowSlowEnv > 1e-4f && lowSlowEnv < threshLowUp)
-    {
-        float ratio = threshLowUp / lowSlowEnv;
-        lowUpGain = std::min(lowUpCeiling, std::pow(ratio, 0.30f));
-    }
-
-    float threshLowDown = 0.40f;
-    float lowDownGain = 1.0f;
-    if (lowFastEnv > threshLowDown)
-        lowDownGain = std::pow(threshLowDown / lowFastEnv, 0.60f);
-
-    float procLow = lowSine * lowUpGain * lowDownGain * 1.06f;
-    procLow = std::tanh(1.10f * procLow) / 1.10f;
-
-    // Mid band (punch & dynamic soft body)
-    midL *= midPreGain;
-    midR *= midPreGain;
-
-    float fastL = envMidFastL.process(midL);
-    float fastR = envMidFastR.process(midR);
-    float slowL = envMidSlowL.process(midL);
-    float slowR = envMidSlowR.process(midR);
-
-    float transL = std::max(0.0f, fastL - slowL);
-    float transR = std::max(0.0f, fastR - slowR);
-
-    float punchL = 1.0f + 0.60f * config.punch * (transL / (fastL + 1e-4f));
-    float punchR = 1.0f + 0.60f * config.punch * (transR / (fastR + 1e-4f));
-
-    float midThresh = 0.22f;
-    float compExponent = 0.35f * config.deharsh;
-    float bodyL = (slowL > midThresh) ? std::pow(midThresh / slowL, compExponent) : 1.0f;
-    float bodyR = (slowR > midThresh) ? std::pow(midThresh / slowR, compExponent) : 1.0f;
-
-    float procMidL = midL * punchL * bodyL;
-    float procMidR = midR * punchR * bodyR;
-
-    procMidL = std::tanh(1.15f * procMidL) / 1.15f;
-    procMidR = std::tanh(1.15f * procMidR) / 1.15f;
-
-    // High band (upward air expansion + downward de-harshing compressor)
-    highL *= highPreGain;
-    highR *= highPreGain;
-
-    float highEnvL = envHighL.process(highL);
-    float highEnvR = envHighR.process(highR);
-
-    float threshHighUp = 0.05f;
-    float highUpGainL = (highEnvL < threshHighUp && highEnvL > 1e-4f) ? std::min(1.4f, std::pow(threshHighUp / highEnvL, 0.25f * config.air)) : 1.0f;
-    float highUpGainR = (highEnvR < threshHighUp && highEnvR > 1e-4f) ? std::min(1.4f, std::pow(threshHighUp / highEnvR, 0.25f * config.air)) : 1.0f;
-
-    float threshHighDown = 0.16f;
-    float highDownGainL = (highEnvL > threshHighDown) ? std::pow(threshHighDown / highEnvL, 0.50f * config.deharsh) : 1.0f;
-    float highDownGainR = (highEnvR > threshHighDown) ? std::pow(threshHighDown / highEnvR, 0.50f * config.deharsh) : 1.0f;
-
-    float highPostGain = 1.06f;
-    float procHighL = highSmoothL.process(highShelfL.process(highL * highUpGainL * highDownGainL)) * highPostGain;
-    float procHighR = highSmoothR.process(highShelfR.process(highR * highUpGainR * highDownGainR)) * highPostGain;
-
-    procHighL = std::tanh(1.2f * procHighL) / 1.2f;
-    procHighR = std::tanh(1.2f * procHighR) / 1.2f;
-
-    // Ambience & stereo separation
-    float dryMidHighL = procMidL + procHighL;
-    float dryMidHighR = procMidR + procHighR;
-
-    float ambL = 0.0f, ambR = 0.0f;
-    ambienceEngine.process(dryMidHighL, dryMidHighR, ambL, ambR);
-
-    float spatialMidHighL = dryMidHighL + config.ambience * ambL;
-    float spatialMidHighR = dryMidHighR + config.ambience * ambR;
-
-    float midChan = 0.5f * (spatialMidHighL + spatialMidHighR);
-    float sideChan = 0.5f * (spatialMidHighL - spatialMidHighR);
-    float widthFactor = 1.0f + 0.35f * config.width;
-    sideChan *= widthFactor;
-
-    float outMidHighL = midChan + sideChan;
-    float outMidHighR = midChan - sideChan;
-
-    // Master scaling & limiting
-    float wetL = (procLow + outMidHighL) * masterScale;
-    float wetR = (procLow + outMidHighR) * masterScale;
+    float wetL = (procLow + midHighL) * masterScale;
+    float wetR = (procLow + midHighR) * masterScale;
 
     wetL = slewL.process(wetL);
     wetR = slewR.process(wetR);
 
-    float mixL = (1.0f - config.amount) * (drivenL * masterScale) + config.amount * wetL;
-    float mixR = (1.0f - config.amount) * (drivenR * masterScale) + config.amount * wetR;
+    // Dry is post-EQ, so this blends rather than bypasses.
+    const float mixL = (1.0f - config.amount) * (drivenL * masterScale) + config.amount * wetL;
+    const float mixR = (1.0f - config.amount) * (drivenR * masterScale) + config.amount * wetR;
 
-    float masterL = softClip(mixL, 0.78f);
-    float masterR = softClip(mixR, 0.78f);
+    outL = softClip(mixL, 0.78f) * ceilingLin;
+    outR = softClip(mixR, 0.78f) * ceilingLin;
+}
 
-    outL = masterL * ceilingLin;
-    outR = masterR * ceilingLin;
+void Chipgoodizer::applyPreEq(float &left, float &right)
+{
+    left = eqHighPassL.process(left);
+    right = eqHighPassR.process(right);
+    left = eqBassWarmthL.process(left);
+    right = eqBassWarmthR.process(right);
+    left = eqMudCutL.process(left);
+    right = eqMudCutR.process(right);
+    left = eqLeadBodyL.process(left);
+    right = eqLeadBodyR.process(right);
+    left = eqTameHarshL.process(left);
+    right = eqTameHarshR.process(right);
+    left = eqLeadAirL.process(left);
+    right = eqLeadAirR.process(right);
+    left = eqShelfAirL.process(left);
+    right = eqShelfAirR.process(right);
+}
+
+float Chipgoodizer::processLowBand(float lowLeft, float lowRight)
+{
+    float lowMono = 0.5f * (lowLeft + lowRight);
+    lowMono *= lowPreGain;
+
+    lowMono = lowSubShelf.process(lowMono);
+    lowMono = lowBodyPeaking.process(lowMono);
+    const float lowSine = lowSmooth.process(lowMono);
+
+    const float lowFastEnv = envLowFast.process(lowSine);
+    const float lowSlowEnv = envLowSlow.process(lowSine);
+
+    constexpr float kThreshLowUp = 0.12f;
+    float lowUpGain = 1.0f;
+    if (lowSlowEnv > 1e-4f && lowSlowEnv < kThreshLowUp)
+        lowUpGain = std::min(lowUpCeiling, std::pow(kThreshLowUp / lowSlowEnv, 0.30f));
+
+    constexpr float kThreshLowDown = 0.40f;
+    float lowDownGain = 1.0f;
+    if (lowFastEnv > kThreshLowDown)
+        lowDownGain = std::pow(kThreshLowDown / lowFastEnv, 0.60f);
+
+    float procLow = lowSine * lowUpGain * lowDownGain * 1.06f;
+    return std::tanh(1.10f * procLow) / 1.10f;
+}
+
+void Chipgoodizer::processMidBand(float &left, float &right)
+{
+    left *= midPreGain;
+    right *= midPreGain;
+
+    const float fastL = envMidFastL.process(left);
+    const float fastR = envMidFastR.process(right);
+    const float slowL = envMidSlowL.process(left);
+    const float slowR = envMidSlowR.process(right);
+
+    const float transL = std::max(0.0f, fastL - slowL);
+    const float transR = std::max(0.0f, fastR - slowR);
+
+    const float punchL = 1.0f + 0.60f * config.punch * (transL / (fastL + 1e-4f));
+    const float punchR = 1.0f + 0.60f * config.punch * (transR / (fastR + 1e-4f));
+
+    constexpr float kMidThresh = 0.22f;
+    const float compExponent = 0.35f * config.deharsh;
+    const float bodyL = (slowL > kMidThresh) ? std::pow(kMidThresh / slowL, compExponent) : 1.0f;
+    const float bodyR = (slowR > kMidThresh) ? std::pow(kMidThresh / slowR, compExponent) : 1.0f;
+
+    float procL = left * punchL * bodyL;
+    float procR = right * punchR * bodyR;
+
+    left = std::tanh(1.15f * procL) / 1.15f;
+    right = std::tanh(1.15f * procR) / 1.15f;
+}
+
+void Chipgoodizer::processHighBand(float &left, float &right)
+{
+    left *= highPreGain;
+    right *= highPreGain;
+
+    const float highEnvL = envHighL.process(left);
+    const float highEnvR = envHighR.process(right);
+
+    constexpr float kThreshHighUp = 0.05f;
+    const float highUpGainL = (highEnvL < kThreshHighUp && highEnvL > 1e-4f)
+                                  ? std::min(1.4f, std::pow(kThreshHighUp / highEnvL, 0.25f * config.air))
+                                  : 1.0f;
+    const float highUpGainR = (highEnvR < kThreshHighUp && highEnvR > 1e-4f)
+                                  ? std::min(1.4f, std::pow(kThreshHighUp / highEnvR, 0.25f * config.air))
+                                  : 1.0f;
+
+    constexpr float kThreshHighDown = 0.16f;
+    const float highDownGainL = (highEnvL > kThreshHighDown)
+                                    ? std::pow(kThreshHighDown / highEnvL, 0.50f * config.deharsh)
+                                    : 1.0f;
+    const float highDownGainR = (highEnvR > kThreshHighDown)
+                                    ? std::pow(kThreshHighDown / highEnvR, 0.50f * config.deharsh)
+                                    : 1.0f;
+
+    constexpr float kHighPostGain = 1.06f;
+    float procHighL = highSmoothL.process(highShelfL.process(left * highUpGainL * highDownGainL)) * kHighPostGain;
+    float procHighR = highSmoothR.process(highShelfR.process(right * highUpGainR * highDownGainR)) * kHighPostGain;
+
+    left = std::tanh(1.2f * procHighL) / 1.2f;
+    right = std::tanh(1.2f * procHighR) / 1.2f;
+}
+
+void Chipgoodizer::applyAmbienceAndWidth(float &left, float &right)
+{
+    float ambL = 0.0f;
+    float ambR = 0.0f;
+    ambienceEngine.process(left, right, ambL, ambR);
+
+    const float spatialL = left + config.ambience * ambL;
+    const float spatialR = right + config.ambience * ambR;
+
+    const float midChan = 0.5f * (spatialL + spatialR);
+    float sideChan = 0.5f * (spatialL - spatialR);
+    sideChan *= 1.0f + 0.35f * config.width;
+
+    left = midChan + sideChan;
+    right = midChan - sideChan;
 }
 
 void Chipgoodizer::process(const float *inL, const float *inR, float *outL, float *outR, size_t numFrames)

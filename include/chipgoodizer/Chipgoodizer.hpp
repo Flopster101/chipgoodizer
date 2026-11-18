@@ -117,6 +117,12 @@ private:
     void updateFilters();
     void applyRequestedConfig();
 
+    void applyPreEq(float &left, float &right);
+    float processLowBand(float lowLeft, float lowRight);
+    void processMidBand(float &left, float &right);
+    void processHighBand(float &left, float &right);
+    void applyAmbienceAndWidth(float &left, float &right);
+
     float fs{44100.0f};
     ChipgoodizerConfig config;
 
