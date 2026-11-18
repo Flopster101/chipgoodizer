@@ -120,7 +120,7 @@ const EffectDescriptor& ChipgoodizerEffect::descriptor() {
             1,
             params,
             count,
-            false, // the engine has its own "Mix" parameter
+            false, // the engine has its own "Blend" parameter
             &createChipgoodizerEffect,
     };
     return desc;

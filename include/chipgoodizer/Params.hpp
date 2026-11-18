@@ -50,7 +50,7 @@ enum class ParamId : int
 constexpr int kParamCount = static_cast<int>(ParamId::Count);
 
 inline const ParamSpec kParamSpecs[kParamCount] = {
-    {"amount", "Mix", ParamType::Float, 0.0f, 1.0f, 0.85f, 0.0f},
+    {"amount", "Blend", ParamType::Float, 0.0f, 1.0f, 0.85f, 0.0f},
     {"rubber", "Rubber", ParamType::Float, 0.0f, 1.0f, 0.85f, 0.0f},
     {"punch", "Punch", ParamType::Float, 0.0f, 1.0f, 0.85f, 0.0f},
     {"air", "Air", ParamType::Float, 0.0f, 1.0f, 0.70f, 0.0f},

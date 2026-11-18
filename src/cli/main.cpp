@@ -46,7 +46,7 @@ void printUsage()
               << "  --preset warm           (Extra 420 Hz warmth, smoother highs)\n"
               << "  --preset club           (Aggressive punch and driving low end)\n\n"
               << "Macro Knobs (0.0 - 1.0):\n"
-              << "  --amount <0.0-1.0>      Dry/wet mix               (default: 0.85)\n"
+              << "  --amount <0.0-1.0>      Wet/dry blend             (default: 0.85)\n"
               << "  --rubber <0.0-1.0>      Bass weight & sine dome   (default: 0.85)\n"
               << "  --punch <0.0-1.0>       Drum snap & mid impact    (default: 0.85)\n"
               << "  --air <0.0-1.0>         High-frequency sheen      (default: 0.70)\n"
