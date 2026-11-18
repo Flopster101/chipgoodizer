@@ -1,0 +1,165 @@
+#pragma once
+
+#include "dsp/Biquad.hpp"
+#include "dsp/Crossover.hpp"
+#include "dsp/EnvelopeFollower.hpp"
+#include "dsp/PhaseRotator.hpp"
+#include "dsp/SlewLimiter.hpp"
+#include "dsp/StereoAmbience.hpp"
+#include "dsp/SoftClip.hpp"
+
+#include <cstddef>
+
+namespace chipgoodizer
+{
+
+enum class Preset
+{
+    Commercial,
+    ScopeSafe,
+    WarmChiptune,
+    PunchyClub
+};
+
+struct ChipgoodizerConfig
+{
+    // Primary macro knobs (0.0 to 1.0)
+    float amount{0.85f};
+    float rubber{0.85f};
+    float punch{0.85f};
+    float air{0.70f};
+    float deharsh{0.85f};
+    float warmth{0.80f};
+    float width{0.60f};
+    float ambience{0.10f};
+
+    // Gain staging (dB)
+    float inputDriveDb{0.0f};
+    float ceilingDb{-1.2f};
+
+    // Tunables
+    float xoverLowHz{220.0f};
+    float xoverHighHz{3800.0f};
+    bool phaseRotation{true};
+
+    static ChipgoodizerConfig getPreset(Preset preset)
+    {
+        ChipgoodizerConfig cfg;
+        switch (preset)
+        {
+        case Preset::Commercial:
+            cfg.amount = 0.85f;
+            cfg.rubber = 0.85f;
+            cfg.punch = 0.85f;
+            cfg.air = 0.70f;
+            cfg.deharsh = 0.85f;
+            cfg.warmth = 0.80f;
+            cfg.width = 0.60f;
+            cfg.ambience = 0.10f;
+            cfg.inputDriveDb = 0.0f;
+            cfg.ceilingDb = -1.2f;
+            break;
+
+        case Preset::ScopeSafe:
+            cfg = getPreset(Preset::Commercial);
+            cfg.ceilingDb = -4.8f;
+            break;
+
+        case Preset::WarmChiptune:
+            cfg.amount = 0.85f;
+            cfg.rubber = 0.90f;
+            cfg.punch = 0.70f;
+            cfg.air = 0.50f;
+            cfg.deharsh = 1.00f;
+            cfg.warmth = 1.00f;
+            cfg.width = 0.50f;
+            cfg.ambience = 0.12f;
+            cfg.inputDriveDb = 0.0f;
+            cfg.ceilingDb = -1.5f;
+            break;
+
+        case Preset::PunchyClub:
+            cfg.amount = 0.95f;
+            cfg.rubber = 0.90f;
+            cfg.punch = 1.00f;
+            cfg.air = 0.85f;
+            cfg.deharsh = 0.75f;
+            cfg.warmth = 0.70f;
+            cfg.width = 0.75f;
+            cfg.ambience = 0.15f;
+            cfg.inputDriveDb = 1.5f;
+            cfg.ceilingDb = -1.0f;
+            break;
+        }
+        return cfg;
+    }
+};
+
+class Chipgoodizer
+{
+public:
+    Chipgoodizer() = default;
+
+    void init(float sampleRate, const ChipgoodizerConfig &cfg = {});
+    void setConfig(const ChipgoodizerConfig &cfg);
+    const ChipgoodizerConfig &getConfig() const { return config; }
+    void reset();
+
+    void processStereo(float inL, float inR, float &outL, float &outR);
+    void process(const float *inL, const float *inR, float *outL, float *outR, size_t numFrames);
+    void processInterleaved(float *interleavedStereo, size_t numFrames);
+
+private:
+    void updateFilters();
+
+    float fs{44100.0f};
+    ChipgoodizerConfig config;
+
+    // Derived gains, refreshed by updateFilters() so the audio path stays free
+    // of per-sample pow() calls.
+    float driveLin{1.0f};
+    float ceilingLin{0.87f};
+    float lowPreGain{1.0f};
+    float midPreGain{1.19f};
+    float highPreGain{1.0f};
+    float masterScale{0.72f};
+    float lowUpCeiling{1.51f};
+
+    PhaseRotator rotator;
+
+    Biquad eqHighPassL, eqHighPassR;
+    Biquad eqBassWarmthL, eqBassWarmthR;
+    Biquad eqMudCutL, eqMudCutR;
+    Biquad eqLeadBodyL, eqLeadBodyR;
+    Biquad eqTameHarshL, eqTameHarshR;
+    Biquad eqLeadAirL, eqLeadAirR;
+    Biquad eqShelfAirL, eqShelfAirR;
+
+    SlewLimiter slewL;
+    SlewLimiter slewR;
+
+    Crossover3Band xoverL;
+    Crossover3Band xoverR;
+
+    Biquad lowSubShelf;
+    Biquad lowBodyPeaking;
+    Biquad lowSmooth;
+    EnvelopeFollower envLowFast;
+    EnvelopeFollower envLowSlow;
+
+    EnvelopeFollower envMidFastL;
+    EnvelopeFollower envMidFastR;
+    EnvelopeFollower envMidSlowL;
+    EnvelopeFollower envMidSlowR;
+
+    EnvelopeFollower envHighL;
+    EnvelopeFollower envHighR;
+    Biquad highShelfL;
+    Biquad highShelfR;
+    Biquad highSmoothL;
+    Biquad highSmoothR;
+
+    StereoAmbience ambienceEngine;
+};
+
+} // namespace chipgoodizer
