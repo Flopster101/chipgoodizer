@@ -4,7 +4,6 @@
 
 #include <array>
 #include <atomic>
-#include <cmath>
 #include <new>
 
 using chipgoodizer::Chipgoodizer;
@@ -53,7 +52,7 @@ void setParam(cg_effect *effect, int index, float value)
         return;
 
     const ParamSpec *spec = chipgoodizer::paramSpec(static_cast<ParamId>(index));
-    if (!std::isfinite(value))
+    if (!chipgoodizer::isFiniteValue(value))
         return;
 
     if (value < spec->minValue)
@@ -89,7 +88,7 @@ void cg_destroy(cg_effect *effect)
 
 void cg_prepare(cg_effect *effect, double sample_rate, int channels)
 {
-    if (!effect || !std::isfinite(sample_rate) || sample_rate <= 0.0)
+    if (!effect || !chipgoodizer::isFiniteValue(sample_rate) || sample_rate <= 0.0)
         return;
 
     (void)channels;

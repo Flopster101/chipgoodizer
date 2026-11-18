@@ -31,7 +31,7 @@ bool parseNumber(const char *text, float &out)
     errno = 0;
     char *end = nullptr;
     const float value = std::strtof(text, &end);
-    if (end == text || *end != '\0' || errno == ERANGE || !std::isfinite(value))
+    if (end == text || *end != '\0' || errno == ERANGE || !chipgoodizer::isFiniteValue(value))
         return false;
 
     out = value;

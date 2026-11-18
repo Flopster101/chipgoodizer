@@ -24,6 +24,15 @@ if(CHIPGOODIZER_BUILD_CLI AND NOT CHIPGOODIZER_BUILD_IO)
     message(FATAL_ERROR "CHIPGOODIZER_BUILD_CLI requires CHIPGOODIZER_BUILD_IO")
 endif()
 
+# Hosts build with -ffast-math; these come last and win.
+function(chipgoodizer_set_fp_semantics target)
+    if(MSVC)
+        target_compile_options(${target} PRIVATE /fp:precise)
+    else()
+        target_compile_options(${target} PRIVATE -fno-fast-math)
+    endif()
+endfunction()
+
 function(chipgoodizer_set_warnings target)
     if(MSVC)
         target_compile_options(${target} PRIVATE /W4)
@@ -54,6 +63,7 @@ set_target_properties(chipgoodizer_dsp PROPERTIES
     EXPORT_NAME dsp
 )
 
+chipgoodizer_set_fp_semantics(chipgoodizer_dsp)
 chipgoodizer_set_warnings(chipgoodizer_dsp)
 
 # -----------------------------------------------------------------------------
@@ -75,6 +85,7 @@ if(CHIPGOODIZER_BUILD_CAPI)
         EXPORT_NAME capi
     )
 
+    chipgoodizer_set_fp_semantics(chipgoodizer_capi)
     chipgoodizer_set_warnings(chipgoodizer_capi)
 endif()
 
@@ -97,6 +108,7 @@ if(CHIPGOODIZER_BUILD_IO)
     )
 
     set_target_properties(chipgoodizer_io PROPERTIES EXPORT_NAME io)
+    chipgoodizer_set_fp_semantics(chipgoodizer_io)
     chipgoodizer_set_warnings(chipgoodizer_io)
 endif()
 
@@ -116,6 +128,7 @@ if(CHIPGOODIZER_BUILD_CLI)
 
     set_target_properties(chipgoodizer_cli PROPERTIES OUTPUT_NAME chipgoodizer)
     set_target_properties(chipgoodizer_cli PROPERTIES EXPORT_NAME cli)
+    chipgoodizer_set_fp_semantics(chipgoodizer_cli)
     chipgoodizer_set_warnings(chipgoodizer_cli)
 endif()
 
@@ -141,8 +154,32 @@ if(CHIPGOODIZER_BUILD_TESTS)
         target_compile_definitions(chipgoodizer_tests PRIVATE CHIPGOODIZER_HAVE_IO)
     endif()
 
+    chipgoodizer_set_fp_semantics(chipgoodizer_tests)
     chipgoodizer_set_warnings(chipgoodizer_tests)
     add_test(NAME chipgoodizer_tests COMMAND chipgoodizer_tests)
+
+    # The same engine built the way a host would, without the pin.
+    if(NOT MSVC)
+        add_executable(chipgoodizer_tests_fastmath
+            tests/chipgoodizer_tests.cpp
+            src/dsp/Chipgoodizer.cpp
+            src/capi/chipgoodizer_c.cpp
+        )
+
+        target_include_directories(chipgoodizer_tests_fastmath PRIVATE include)
+        target_compile_options(chipgoodizer_tests_fastmath PRIVATE -O3 -ffast-math)
+        target_compile_definitions(chipgoodizer_tests_fastmath PRIVATE
+            CHIPGOODIZER_HAVE_CAPI
+            CHIPGOODIZER_FAST_MATH_BUILD
+        )
+        set_target_properties(chipgoodizer_tests_fastmath PROPERTIES
+            CXX_STANDARD 20
+            CXX_STANDARD_REQUIRED ON
+        )
+
+        chipgoodizer_set_warnings(chipgoodizer_tests_fastmath)
+        add_test(NAME chipgoodizer_tests_fastmath COMMAND chipgoodizer_tests_fastmath)
+    endif()
 endif()
 
 # -----------------------------------------------------------------------------

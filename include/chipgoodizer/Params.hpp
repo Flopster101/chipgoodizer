@@ -170,12 +170,25 @@ inline float getParam(const ChipgoodizerConfig &cfg, ParamId id)
     return 0.0f;
 }
 
-// Clamps to the spec range and rejects non-finite input. Returns false when the
-// value was ignored.
+// Not std::isfinite(): -ffast-math folds that test to true, so read the bits.
+inline bool isFiniteValue(float value)
+{
+    uint32_t bits = 0;
+    std::memcpy(&bits, &value, sizeof(bits));
+    return (bits & 0x7F800000u) != 0x7F800000u;
+}
+
+inline bool isFiniteValue(double value)
+{
+    uint64_t bits = 0;
+    std::memcpy(&bits, &value, sizeof(bits));
+    return (bits & 0x7FF0000000000000ull) != 0x7FF0000000000000ull;
+}
+
 inline bool setParam(ChipgoodizerConfig &cfg, ParamId id, float value)
 {
     const ParamSpec *spec = paramSpec(id);
-    if (!spec || !std::isfinite(value))
+    if (!spec || !isFiniteValue(value))
         return false;
 
     if (value < spec->minValue)
