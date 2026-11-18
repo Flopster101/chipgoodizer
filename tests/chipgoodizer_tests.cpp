@@ -8,6 +8,10 @@
 #include "chipgoodizer/chipgoodizer_c.h"
 #endif
 
+#ifdef CHIPGOODIZER_HAVE_IO
+#include "chipgoodizer/io/WavFile.hpp"
+#endif
+
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -301,6 +305,79 @@ void testConcurrentParameterChanges()
 }
 #endif
 
+#ifdef CHIPGOODIZER_HAVE_IO
+// Exercises both halves: the writer patches its header, the reader walks it.
+void testWavRoundTrip()
+{
+    const char *path = "chipgoodizer_roundtrip.wav";
+    constexpr size_t kFrames = 1000;
+
+    std::vector<float> left(kFrames);
+    std::vector<float> right(kFrames);
+    for (size_t i = 0; i < kFrames; ++i)
+    {
+        const double phase = 2.0 * chipgoodizer::kPi * 440.0 * static_cast<double>(i) / kSampleRate;
+        left[i] = 0.6f * static_cast<float>(std::sin(phase));
+        right[i] = -0.5f * left[i];
+    }
+    left[0] = 1.0f;
+    left[1] = -1.0f;
+
+    {
+        chipgoodizer::io::WavWriter writer;
+        check(writer.open(path, kSampleRate), "WavWriter opens an output file");
+        check(writer.write(left, right, kFrames), "WavWriter writes a block");
+        check(writer.close(), "WavWriter patches the header on close");
+    }
+
+    chipgoodizer::io::WavReader reader;
+    check(reader.open(path), "WavReader opens the file it just wrote");
+    check(reader.sampleRate() == kSampleRate, "WavReader reports the sample rate");
+    check(reader.channels() == 2, "WavReader reports two channels");
+    check(reader.totalFrames() == kFrames, "WavReader reports the frame count");
+
+    std::vector<float> readL;
+    std::vector<float> readR;
+    size_t received = 0;
+    while (true)
+    {
+        // Smaller blocks than the writer used, to exercise partial reads.
+        const size_t frames = reader.read(readL, readR, 250);
+        if (frames == 0)
+            break;
+
+        for (size_t i = 0; i < frames; ++i)
+        {
+            check(std::fabs(readL[i] - left[received + i]) <= 1.0e-6f, "round trip keeps the left channel");
+            check(std::fabs(readR[i] - right[received + i]) <= 1.0e-6f, "round trip keeps the right channel");
+        }
+        received += frames;
+    }
+
+    check(!reader.failed(), "WavReader reaches the end of the data chunk cleanly");
+    check(received == kFrames, "round trip returns every frame");
+    reader.close();
+    std::remove(path);
+
+    chipgoodizer::io::WavReader missing;
+    check(!missing.open("chipgoodizer_no_such_file.wav"), "WavReader rejects a missing file");
+}
+
+void testWavWriterLimit()
+{
+    const char *path = "chipgoodizer_overflow.wav";
+    chipgoodizer::io::WavWriter writer;
+    check(writer.open(path, kSampleRate), "WavWriter opens for the limit check");
+
+    // Six bytes per frame, so the 32-bit RIFF size field caps the frame count.
+    const size_t tooMany = 800000000;
+    const std::vector<float> sample(1, 0.0f);
+    check(!writer.write(sample, sample, tooMany), "WavWriter refuses output past the 32-bit size field");
+    writer.close();
+    std::remove(path);
+}
+#endif
+
 } // namespace
 
 int main()
@@ -313,6 +390,10 @@ int main()
 #ifdef CHIPGOODIZER_HAVE_CAPI
     testCApi();
     testConcurrentParameterChanges();
+#endif
+#ifdef CHIPGOODIZER_HAVE_IO
+    testWavRoundTrip();
+    testWavWriterLimit();
 #endif
 
     if (gFailures == 0)

@@ -136,6 +136,11 @@ if(CHIPGOODIZER_BUILD_TESTS)
         target_compile_definitions(chipgoodizer_tests PRIVATE CHIPGOODIZER_HAVE_CAPI)
     endif()
 
+    if(CHIPGOODIZER_BUILD_IO)
+        target_link_libraries(chipgoodizer_tests PRIVATE chipgoodizer_io)
+        target_compile_definitions(chipgoodizer_tests PRIVATE CHIPGOODIZER_HAVE_IO)
+    endif()
+
     chipgoodizer_set_warnings(chipgoodizer_tests)
     add_test(NAME chipgoodizer_tests COMMAND chipgoodizer_tests)
 endif()
