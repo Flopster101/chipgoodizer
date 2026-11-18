@@ -16,6 +16,11 @@ Vendor the repository (submodule or copy) somewhere the native build can reach, 
 `external/chipgoodizer`, and add it to `app/src/main/cpp/CMakeLists.txt`:
 
 ```cmake
+# Options must be set before add_subdirectory() reads them.
+set(CHIPGOODIZER_BUILD_CLI OFF CACHE BOOL "" FORCE)
+set(CHIPGOODIZER_BUILD_IO OFF CACHE BOOL "" FORCE)
+set(CHIPGOODIZER_INSTALL OFF CACHE BOOL "" FORCE)
+
 add_subdirectory(
         ../../../../external/chipgoodizer
         ${CMAKE_CURRENT_BINARY_DIR}/chipgoodizer
@@ -26,13 +31,7 @@ target_link_libraries(siliconplayer PRIVATE chipgoodizer::capi)
 ```
 
 `chipgoodizer::capi` pulls in `chipgoodizer::dsp` and publishes its include
-directory. Disable the demo renderer there if you do not want it built:
-
-```cmake
-set(CHIPGOODIZER_BUILD_CLI OFF CACHE BOOL "" FORCE)
-set(CHIPGOODIZER_BUILD_IO OFF CACHE BOOL "" FORCE)
-set(CHIPGOODIZER_INSTALL OFF CACHE BOOL "" FORCE)
-```
+directory.
 
 ## 2. Node wrapper
 
