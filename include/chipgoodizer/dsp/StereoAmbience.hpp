@@ -1,95 +1,77 @@
 #pragma once
 
+#include "Biquad.hpp"
+
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <vector>
 
 namespace chipgoodizer
 {
 
+// Schroeder room: four damped combs on the mono sum, 250 Hz send high pass.
 class StereoAmbience
 {
 public:
     void init(float sampleRate)
     {
-        fs = sampleRate;
-        combLengths[0] = static_cast<size_t>(0.0062f * fs);
-        combLengths[1] = static_cast<size_t>(0.0078f * fs);
-        combLengths[2] = static_cast<size_t>(0.0094f * fs);
-        combLengths[3] = static_cast<size_t>(0.0112f * fs);
-
-        apLengths[0] = static_cast<size_t>(0.0021f * fs);
-        apLengths[1] = static_cast<size_t>(0.0033f * fs);
+        static const float kDelayTimes[4] = {0.0123f, 0.0157f, 0.0191f, 0.0233f};
 
         for (int i = 0; i < 4; ++i)
         {
-            combBuf[i].assign(combLengths[i], 0.0f);
-            combIdx[i] = 0;
-            combFilter[i] = 0.0f;
+            combLengths[i] = static_cast<size_t>(std::round(kDelayTimes[i] * sampleRate));
+            combBuffers[i].assign(combLengths[i], 0.0f);
         }
 
-        for (int i = 0; i < 2; ++i)
-        {
-            apBuf[i].assign(apLengths[i], 0.0f);
-            apIdx[i] = 0;
-        }
+        highPass.setHighPass(250.0f, sampleRate, 0.707f);
+        reset();
     }
 
     inline void process(float inL, float inR, float &wetL, float &wetR)
     {
         float monoIn = 0.5f * (inL + inR);
+        float filtered = highPass.process(monoIn);
 
         float outComb[4];
         for (int i = 0; i < 4; ++i)
         {
-            float delayed = combBuf[i][combIdx[i]];
-            combFilter[i] = delayed * 0.70f + combFilter[i] * 0.30f;
-            combBuf[i][combIdx[i]] = monoIn + combFilter[i] * 0.65f;
-            combIdx[i] = (combIdx[i] + 1) % combLengths[i];
+            const size_t index = combIndex[i];
+            const float delayed = combBuffers[i][index];
+
+            dampState[i] = delayed * (1.0f - kDamp) + dampState[i] * kDamp;
+            combBuffers[i][index] = filtered + dampState[i] * kFeedback;
+            combIndex[i] = (index + 1) % combLengths[i];
+
             outComb[i] = delayed;
         }
 
-        float rawL = outComb[0] - outComb[1] + 0.5f * (outComb[2] - outComb[3]);
-        float rawR = outComb[2] - outComb[3] + 0.5f * (outComb[0] - outComb[1]);
-
-        wetL = processAllpass(rawL, 0);
-        wetR = processAllpass(rawR, 1);
+        // Left takes combs 0/2, right 1/3.
+        wetL = outComb[0] - outComb[2];
+        wetR = outComb[1] - outComb[3];
     }
 
     void reset()
     {
         for (int i = 0; i < 4; ++i)
         {
-            std::fill(combBuf[i].begin(), combBuf[i].end(), 0.0f);
-            combIdx[i] = 0;
-            combFilter[i] = 0.0f;
+            std::fill(combBuffers[i].begin(), combBuffers[i].end(), 0.0f);
+            combIndex[i] = 0;
+            dampState[i] = 0.0f;
         }
-        for (int i = 0; i < 2; ++i)
-        {
-            std::fill(apBuf[i].begin(), apBuf[i].end(), 0.0f);
-            apIdx[i] = 0;
-        }
+        highPass.reset();
     }
 
 private:
-    inline float processAllpass(float in, int idx)
-    {
-        float delayed = apBuf[idx][apIdx[idx]];
-        float out = -in + delayed;
-        apBuf[idx][apIdx[idx]] = in + delayed * 0.60f;
-        apIdx[idx] = (apIdx[idx] + 1) % apLengths[idx];
-        return out;
-    }
+    // ~0.32 s tight room decay with high-frequency damping.
+    static constexpr float kFeedback = 0.40f;
+    static constexpr float kDamp = 0.35f;
 
-    float fs{44100.0f};
     size_t combLengths[4]{};
-    std::vector<float> combBuf[4];
-    size_t combIdx[4]{};
-    float combFilter[4]{};
-
-    size_t apLengths[2]{};
-    std::vector<float> apBuf[2];
-    size_t apIdx[2]{};
+    std::vector<float> combBuffers[4];
+    size_t combIndex[4]{};
+    float dampState[4]{};
+    Biquad highPass;
 };
 
 } // namespace chipgoodizer
