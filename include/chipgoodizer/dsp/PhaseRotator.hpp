@@ -12,7 +12,7 @@ class PhaseRotator
 public:
     void init(float fc, float fs)
     {
-        const float w0 = static_cast<float>(M_PI) * fc / fs;
+        const float w0 = static_cast<float>(kPi) * fc / fs;
         const float tanW0 = std::tan(w0);
         a = (tanW0 - 1.0f) / (tanW0 + 1.0f);
         reset();

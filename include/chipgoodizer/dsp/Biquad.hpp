@@ -21,7 +21,7 @@ public:
 
     void setLowPass(float fc, float fs, float Q = 0.70710678f)
     {
-        float w0 = 2.0f * M_PI * fc / fs;
+        float w0 = 2.0f * kPi * fc / fs;
         float cos_w0 = std::cos(w0);
         float alpha = std::sin(w0) / (2.0f * Q);
         float a0 = 1.0f + alpha;
@@ -35,7 +35,7 @@ public:
 
     void setHighPass(float fc, float fs, float Q = 0.70710678f)
     {
-        float w0 = 2.0f * M_PI * fc / fs;
+        float w0 = 2.0f * kPi * fc / fs;
         float cos_w0 = std::cos(w0);
         float alpha = std::sin(w0) / (2.0f * Q);
         float a0 = 1.0f + alpha;
@@ -49,7 +49,7 @@ public:
 
     void setBandPass(float fc, float fs, float Q = 0.70710678f)
     {
-        float w0 = 2.0f * M_PI * fc / fs;
+        float w0 = 2.0f * kPi * fc / fs;
         float cos_w0 = std::cos(w0);
         float sin_w0 = std::sin(w0);
         float alpha = sin_w0 / (2.0f * Q);
@@ -64,7 +64,7 @@ public:
 
     void setNotch(float fc, float fs, float Q = 1.0f)
     {
-        float w0 = 2.0f * M_PI * fc / fs;
+        float w0 = 2.0f * kPi * fc / fs;
         float cos_w0 = std::cos(w0);
         float alpha = std::sin(w0) / (2.0f * Q);
         float a0 = 1.0f + alpha;
@@ -79,7 +79,7 @@ public:
     void setLowShelf(float fc, float fs, float gainDb, float S = 1.0f)
     {
         float A = std::pow(10.0f, gainDb / 40.0f);
-        float w0 = 2.0f * M_PI * fc / fs;
+        float w0 = 2.0f * kPi * fc / fs;
         float cos_w0 = std::cos(w0);
         float sin_w0 = std::sin(w0);
         float alpha = sin_w0 * 0.5f * std::sqrt((A + 1.0f / A) * (1.0f / S - 1.0f) + 2.0f);
@@ -98,7 +98,7 @@ public:
     void setHighShelf(float fc, float fs, float gainDb, float S = 1.0f)
     {
         float A = std::pow(10.0f, gainDb / 40.0f);
-        float w0 = 2.0f * M_PI * fc / fs;
+        float w0 = 2.0f * kPi * fc / fs;
         float cos_w0 = std::cos(w0);
         float sin_w0 = std::sin(w0);
         float alpha = sin_w0 * 0.5f * std::sqrt((A + 1.0f / A) * (1.0f / S - 1.0f) + 2.0f);
@@ -117,7 +117,7 @@ public:
     void setPeaking(float fc, float fs, float gainDb, float Q = 0.70710678f)
     {
         float A = std::pow(10.0f, gainDb / 40.0f);
-        float w0 = 2.0f * M_PI * fc / fs;
+        float w0 = 2.0f * kPi * fc / fs;
         float cos_w0 = std::cos(w0);
         float sin_w0 = std::sin(w0);
         float alpha = sin_w0 / (2.0f * Q);

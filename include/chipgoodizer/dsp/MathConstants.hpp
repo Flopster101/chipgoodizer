@@ -3,8 +3,8 @@
 namespace chipgoodizer
 {
 
-#ifndef M_PI
-constexpr float M_PI = 3.14159265358979323846f;
-#endif
+// M_PI needs POSIX extensions; this keeps the double value coefficients were
+// tuned with.
+inline constexpr double kPi = 3.14159265358979323846;
 
 } // namespace chipgoodizer
