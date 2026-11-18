@@ -1,9 +1,11 @@
 #include "chipgoodizer/io/WavFile.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <cstring>
 #include <fstream>
+#include <limits>
 
 namespace chipgoodizer::io
 {
@@ -36,6 +38,27 @@ struct FmtChunk
 };
 #pragma pack(pop)
 
+constexpr uint16_t kFmtPcm = 1;
+constexpr uint16_t kFmtIeeeFloat = 3;
+constexpr uint16_t kFmtExtensible = 0xFFFE;
+
+bool isSupportedFormat(const FmtChunk &fmt)
+{
+    if (fmt.numChannels < 1 || fmt.sampleRate == 0)
+        return false;
+
+    switch (fmt.audioFormat)
+    {
+    case kFmtPcm:
+        return fmt.bitsPerSample == 16 || fmt.bitsPerSample == 24 || fmt.bitsPerSample == 32;
+
+    case kFmtIeeeFloat:
+        return fmt.bitsPerSample == 32;
+    }
+
+    return false;
+}
+
 } // namespace
 
 bool loadWav(const std::string &path, std::vector<float> &outLeft, std::vector<float> &outRight, float &outSampleRate)
@@ -44,13 +67,18 @@ bool loadWav(const std::string &path, std::vector<float> &outLeft, std::vector<f
     if (!file)
         return false;
 
+    file.seekg(0, std::ios::end);
+    const std::streamoff fileSize = file.tellg();
+    file.seekg(0, std::ios::beg);
+
     WavHeader waveHeader;
     file.read(reinterpret_cast<char *>(&waveHeader), sizeof(waveHeader));
-    if (std::memcmp(waveHeader.riffTag, "RIFF", 4) != 0 || std::memcmp(waveHeader.waveTag, "WAVE", 4) != 0)
+    if (!file || std::memcmp(waveHeader.riffTag, "RIFF", 4) != 0 || std::memcmp(waveHeader.waveTag, "WAVE", 4) != 0)
         return false;
 
     FmtChunk fmt{};
     bool foundFmt = false;
+    bool foundData = false;
     std::vector<uint8_t> rawAudio;
 
     while (file)
@@ -60,16 +88,26 @@ bool loadWav(const std::string &path, std::vector<float> &outLeft, std::vector<f
         if (!file)
             break;
 
+        const std::streamoff remaining = fileSize - static_cast<std::streamoff>(file.tellg());
+        if (remaining < 0 || static_cast<std::streamoff>(ch.chunkSize) > remaining)
+            return false;
+
+        const size_t chunkSize = ch.chunkSize;
+        const size_t paddedSize = chunkSize + (chunkSize & 1);
+
         if (std::memcmp(ch.chunkId, "fmt ", 4) == 0)
         {
             uint8_t fmtBody[40]{};
-            size_t readSize = std::min(sizeof(fmtBody), static_cast<size_t>(ch.chunkSize));
-            file.read(reinterpret_cast<char *>(fmtBody), readSize);
-            if (ch.chunkSize > readSize)
-                file.seekg(ch.chunkSize - readSize, std::ios::cur);
+            const size_t readSize = std::min(sizeof(fmtBody), chunkSize);
+            file.read(reinterpret_cast<char *>(fmtBody), static_cast<std::streamsize>(readSize));
+            if (static_cast<size_t>(file.gcount()) != readSize)
+                return false;
+            if (readSize < paddedSize)
+                file.seekg(static_cast<std::streamoff>(paddedSize - readSize), std::ios::cur);
+
             std::memcpy(&fmt, fmtBody, std::min(sizeof(FmtChunk), readSize));
             // WAVE_FORMAT_EXTENSIBLE: the real format lives in the SubFormat GUID
-            if (fmt.audioFormat == 0xFFFE && readSize >= 26)
+            if (fmt.audioFormat == kFmtExtensible && readSize >= 26)
             {
                 uint16_t subFormat;
                 std::memcpy(&subFormat, fmtBody + 24, sizeof(subFormat));
@@ -79,27 +117,30 @@ bool loadWav(const std::string &path, std::vector<float> &outLeft, std::vector<f
         }
         else if (std::memcmp(ch.chunkId, "data", 4) == 0)
         {
-            rawAudio.resize(ch.chunkSize);
-            file.read(reinterpret_cast<char *>(rawAudio.data()), ch.chunkSize);
+            rawAudio.resize(chunkSize);
+            if (chunkSize > 0)
+            {
+                file.read(reinterpret_cast<char *>(rawAudio.data()), static_cast<std::streamsize>(chunkSize));
+                if (static_cast<size_t>(file.gcount()) != chunkSize)
+                    return false;
+            }
+            foundData = true;
             break;
         }
         else
         {
-            file.seekg(ch.chunkSize, std::ios::cur);
+            file.seekg(static_cast<std::streamoff>(paddedSize), std::ios::cur);
         }
     }
 
-    if (!foundFmt || rawAudio.empty())
-        return false;
-
-    if (fmt.audioFormat != 1 && fmt.audioFormat != 3)
+    if (!foundFmt || !foundData || rawAudio.empty() || !isSupportedFormat(fmt))
         return false;
 
     outSampleRate = static_cast<float>(fmt.sampleRate);
-    size_t numChannels = fmt.numChannels;
-    size_t bytesPerSample = fmt.bitsPerSample / 8;
-    size_t numSamples = rawAudio.size() / bytesPerSample;
-    size_t numFrames = numSamples / numChannels;
+    const size_t numChannels = fmt.numChannels;
+    const size_t bytesPerSample = static_cast<size_t>(fmt.bitsPerSample) / 8;
+    const size_t numSamples = rawAudio.size() / bytesPerSample;
+    const size_t numFrames = numSamples / numChannels;
 
     outLeft.resize(numFrames);
     outRight.resize(numFrames);
@@ -110,7 +151,7 @@ bool loadWav(const std::string &path, std::vector<float> &outLeft, std::vector<f
         for (size_t ch = 0; ch < numChannels; ++ch)
         {
             float s = 0.0f;
-            if (fmt.audioFormat == 1) // PCM
+            if (fmt.audioFormat == kFmtPcm)
             {
                 if (bytesPerSample == 2)
                 {
@@ -127,7 +168,7 @@ bool loadWav(const std::string &path, std::vector<float> &outLeft, std::vector<f
                     s = val / 8388608.0f;
                     src += 3;
                 }
-                else if (bytesPerSample == 4)
+                else
                 {
                     int32_t val;
                     std::memcpy(&val, src, 4);
@@ -135,13 +176,10 @@ bool loadWav(const std::string &path, std::vector<float> &outLeft, std::vector<f
                     src += 4;
                 }
             }
-            else if (fmt.audioFormat == 3) // IEEE Float
+            else
             {
-                if (bytesPerSample == 4)
-                {
-                    std::memcpy(&s, src, 4);
-                    src += 4;
-                }
+                std::memcpy(&s, src, 4);
+                src += 4;
             }
 
             if (ch == 0)
@@ -163,8 +201,13 @@ bool writeWav24(const std::string &path, const std::vector<float> &left, const s
     if (!file)
         return false;
 
-    size_t numFrames = left.size();
-    uint32_t dataBytes = static_cast<uint32_t>(numFrames * 2 * 3);
+    const size_t numFrames = left.size();
+    const size_t payloadBytes = numFrames * 2 * 3;
+    const size_t maxPayload = static_cast<size_t>(std::numeric_limits<uint32_t>::max()) - 36;
+    if (payloadBytes > maxPayload)
+        return false;
+
+    const uint32_t dataBytes = static_cast<uint32_t>(payloadBytes);
 
     WavHeader waveHeader;
     std::memcpy(waveHeader.riffTag, "RIFF", 4);
@@ -197,7 +240,7 @@ bool writeWav24(const std::string &path, const std::vector<float> &left, const s
         {
             float s = (ch == 0) ? left[i] : right[i];
             s = std::clamp(s, -1.0f, 1.0f);
-            int32_t val = static_cast<int32_t>(s * 8388607.0f);
+            const int32_t val = static_cast<int32_t>(std::lround(s * 8388607.0f));
             uint8_t bytes[3];
             bytes[0] = val & 0xFF;
             bytes[1] = (val >> 8) & 0xFF;
