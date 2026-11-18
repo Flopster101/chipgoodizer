@@ -1,6 +1,7 @@
 # Build artifacts
 build/
 bin/
+/chipgoodizer
 *.o
 *.a
 *.so
@@ -12,7 +13,6 @@ bin/
 CMakeFiles/
 CMakeCache.txt
 cmake_install.cmake
-Makefile
 *.ninja
 .ninja_*
 
