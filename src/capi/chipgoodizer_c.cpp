@@ -108,28 +108,7 @@ void cg_process_interleaved(cg_effect *effect, float *interleaved, int frames, i
     if (!effect || !interleaved || frames <= 0 || channels <= 0)
         return;
 
-    if (channels == 1)
-    {
-        for (int i = 0; i < frames; ++i)
-        {
-            const float in = interleaved[i];
-            float outL = 0.0f;
-            float outR = 0.0f;
-            effect->dsp.processStereo(in, in, outL, outR);
-            interleaved[i] = 0.5f * (outL + outR);
-        }
-        return;
-    }
-
-    for (int i = 0; i < frames; ++i)
-    {
-        float *frame = interleaved + static_cast<size_t>(i) * static_cast<size_t>(channels);
-        float outL = 0.0f;
-        float outR = 0.0f;
-        effect->dsp.processStereo(frame[0], frame[1], outL, outR);
-        frame[0] = outL;
-        frame[1] = outR;
-    }
+    effect->dsp.processInterleaved(interleaved, static_cast<size_t>(frames), channels);
 }
 
 int cg_param_count(void)

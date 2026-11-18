@@ -352,16 +352,33 @@ void Chipgoodizer::process(const float *inL, const float *inR, float *outL, floa
     }
 }
 
-void Chipgoodizer::processInterleaved(float *interleavedStereo, size_t numFrames)
+void Chipgoodizer::processInterleaved(float *interleavedStereo, size_t numFrames, int channels)
 {
     enableDenormalFlushing();
 
+    if (channels < 2)
+    {
+        // Mono: same signal both sides, average back.
+        for (size_t i = 0; i < numFrames; ++i)
+        {
+            const float in = interleavedStereo[i];
+            float outL = 0.0f;
+            float outR = 0.0f;
+            processStereo(in, in, outL, outR);
+            interleavedStereo[i] = 0.5f * (outL + outR);
+        }
+        return;
+    }
+
+    const size_t stride = static_cast<size_t>(channels);
     for (size_t i = 0; i < numFrames; ++i)
     {
-        float outL, outR;
-        processStereo(interleavedStereo[2 * i], interleavedStereo[2 * i + 1], outL, outR);
-        interleavedStereo[2 * i] = outL;
-        interleavedStereo[2 * i + 1] = outR;
+        float *frame = interleavedStereo + i * stride;
+        float outL = 0.0f;
+        float outR = 0.0f;
+        processStereo(frame[0], frame[1], outL, outR);
+        frame[0] = outL;
+        frame[1] = outR;
     }
 }
 

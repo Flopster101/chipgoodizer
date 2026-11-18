@@ -107,13 +107,11 @@ public:
     // Safe from any thread; picked up at the next sample.
     void setConfig(const ChipgoodizerConfig &cfg);
 
-    // Audio-thread view of the settings currently in use.
-    const ChipgoodizerConfig &getConfig() const { return config; }
     void reset();
 
     void processStereo(float inL, float inR, float &outL, float &outR);
     void process(const float *inL, const float *inR, float *outL, float *outR, size_t numFrames);
-    void processInterleaved(float *interleavedStereo, size_t numFrames);
+    void processInterleaved(float *interleavedStereo, size_t numFrames, int channels = 2);
 
 private:
     void updateFilters();
