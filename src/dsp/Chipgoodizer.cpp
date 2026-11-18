@@ -135,14 +135,18 @@ void Chipgoodizer::updateFilters()
     eqLeadBodyL.setPeaking(420.0f, fs, 0.5f * config.warmth, 1.0f);
     eqLeadBodyR.setPeaking(420.0f, fs, 0.5f * config.warmth, 1.0f);
 
-    eqTameHarshL.setPeaking(1750.0f, fs, -4.8f * config.deharsh, 1.4f);
-    eqTameHarshR.setPeaking(1750.0f, fs, -4.8f * config.deharsh, 1.4f);
+    // Gentle anti-fatigue dip at 2.4 kHz to keep square-wave upper mids smooth.
+    eqTameHarshL.setPeaking(2400.0f, fs, -0.8f * config.deharsh, 1.0f);
+    eqTameHarshR.setPeaking(2400.0f, fs, -0.8f * config.deharsh, 1.0f);
 
-    eqLeadAirL.setPeaking(3200.0f, fs, 3.2f * config.air, 1.2f);
-    eqLeadAirR.setPeaking(3200.0f, fs, 3.2f * config.air, 1.2f);
+    // Broad, musical brilliance lift centered at 4.0 kHz for crisp presence
+    // without a harsh jump into 8-12 kHz.
+    eqLeadAirL.setPeaking(4000.0f, fs, 1.9f * config.air, 0.70f);
+    eqLeadAirR.setPeaking(4000.0f, fs, 1.9f * config.air, 0.70f);
 
-    eqShelfAirL.setHighShelf(8500.0f, fs, 3.0f * config.air);
-    eqShelfAirR.setHighShelf(8500.0f, fs, 3.0f * config.air);
+    // Smooth air shelf (fixed RBJ coefficients).
+    eqShelfAirL.setHighShelf(7500.0f, fs, 1.5f * config.air);
+    eqShelfAirR.setHighShelf(7500.0f, fs, 1.5f * config.air);
 
     // Low band internal shaping: punchy 78 Hz weight bell + 135 Hz body
     // instead of a second low shelf that over-boosted 20-50 Hz sub-bass.
@@ -151,15 +155,15 @@ void Chipgoodizer::updateFilters()
     lowSmooth.setLowPass(480.0f, fs, 0.707f);
 
     lowPreGain = std::pow(10.0f, (0.5f * config.rubber) / 20.0f);
-    midPreGain = std::pow(10.0f, 1.5f / 20.0f);
-    highPreGain = std::pow(10.0f, (2.0f * config.air) / 20.0f);
+    midPreGain = std::pow(10.0f, 0.7f / 20.0f);
+    highPreGain = std::pow(10.0f, (2.6f * config.air) / 20.0f);
     driveLin = std::pow(10.0f, config.inputDriveDb / 20.0f);
     ceilingLin = std::pow(10.0f, config.ceilingDb / 20.0f);
     masterScale = std::pow(10.0f, -2.8f / 20.0f);
     lowUpCeiling = 1.0f + 0.6f * config.rubber;
 
-    highShelfL.setHighShelf(8500.0f, fs, 5.0f * config.air);
-    highShelfR.setHighShelf(8500.0f, fs, 5.0f * config.air);
+    highShelfL.setHighShelf(6500.0f, fs, 1.3f * config.air);
+    highShelfR.setHighShelf(6500.0f, fs, 1.3f * config.air);
     highSmoothL.setLowPass(16500.0f, fs, 0.707f);
     highSmoothR.setLowPass(16500.0f, fs, 0.707f);
 }
@@ -346,12 +350,10 @@ void Chipgoodizer::processHighBand(float &left, float &right)
                                     ? std::pow(kThreshHighDown / highEnvR, 0.50f * config.deharsh)
                                     : 1.0f;
 
-    constexpr float kHighPostGain = 1.06f;
-    float procHighL = highSmoothL.process(highShelfL.process(left * highUpGainL * highDownGainL)) * kHighPostGain;
-    float procHighR = highSmoothR.process(highShelfR.process(right * highUpGainR * highDownGainR)) * kHighPostGain;
-
-    left = std::tanh(1.2f * procHighL) / 1.2f;
-    right = std::tanh(1.2f * procHighR) / 1.2f;
+    // No un-oversampled tanh here: nonlinear waveshaping above 3.8 kHz folds
+    // aliasing harmonics back into the 2-10 kHz presence band as metallic grit.
+    left = highSmoothL.process(highShelfL.process(left * highUpGainL * highDownGainL));
+    right = highSmoothR.process(highShelfR.process(right * highUpGainR * highDownGainR));
 }
 
 void Chipgoodizer::applyAmbienceAndWidth(float &left, float &right)

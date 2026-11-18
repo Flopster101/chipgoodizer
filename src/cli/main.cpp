@@ -51,7 +51,7 @@ void printUsage()
               << "  --rubber <0.0-1.0>      Bass weight & sine dome   (default: 0.85)\n"
               << "  --punch <0.0-1.0>       Drum snap & mid impact    (default: 0.85)\n"
               << "  --air <0.0-1.0>         High-frequency sheen      (default: 0.70)\n"
-              << "  --deharsh <0.0-1.0>     1.7 kHz screech tamer     (default: 1.00)\n"
+              << "  --deharsh <0.0-1.0>     Upper-mid/high de-harsher (default: 1.00)\n"
               << "  --warmth <0.0-1.0>      420 Hz lead body fill     (default: 1.00)\n"
               << "  --width <0.0-1.0>       Stereo width              (default: 0.60)\n"
               << "  --ambience <0.0-0.3>    Studio acoustic glue      (default: 0.10)\n\n"

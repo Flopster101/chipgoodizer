@@ -136,7 +136,7 @@ private:
     float driveLin{1.0f};
     float ceilingLin{0.87f};
     float lowPreGain{1.0f};
-    float midPreGain{1.19f};
+    float midPreGain{1.0f};
     float highPreGain{1.0f};
     float masterScale{0.72f};
     float lowUpCeiling{1.51f};
