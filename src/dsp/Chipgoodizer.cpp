@@ -119,17 +119,21 @@ void Chipgoodizer::applyRequestedConfig()
 
 void Chipgoodizer::updateFilters()
 {
-    eqHighPassL.setHighPass(30.0f, fs, 0.7071f);
-    eqHighPassR.setHighPass(30.0f, fs, 0.7071f);
+    // Tighten subsonic rolloff to 42 Hz so 20-45 Hz sub-bass stays controlled.
+    eqHighPassL.setHighPass(42.0f, fs, 0.7071f);
+    eqHighPassR.setHighPass(42.0f, fs, 0.7071f);
 
-    eqBassWarmthL.setLowShelf(95.0f, fs, 2.2f * config.rubber);
-    eqBassWarmthR.setLowShelf(95.0f, fs, 2.2f * config.rubber);
+    // Focused bass punch bell at 82 Hz instead of a DC-extending low shelf.
+    eqBassWarmthL.setPeaking(80.0f, fs, 1.1f * config.rubber, 0.85f);
+    eqBassWarmthR.setPeaking(80.0f, fs, 1.1f * config.rubber, 0.85f);
 
-    eqMudCutL.setPeaking(240.0f, fs, -1.8f, 1.2f);
-    eqMudCutR.setPeaking(240.0f, fs, -1.8f, 1.2f);
+    // Gentle mud dip at 205 Hz matching commercial low-mid cleanup.
+    eqMudCutL.setPeaking(205.0f, fs, -1.1f, 1.3f);
+    eqMudCutR.setPeaking(205.0f, fs, -1.1f, 1.3f);
 
-    eqLeadBodyL.setPeaking(420.0f, fs, 2.0f * config.warmth, 1.0f);
-    eqLeadBodyR.setPeaking(420.0f, fs, 2.0f * config.warmth, 1.0f);
+    // Subtle warmth fill around 420 Hz for hollow tracker pulse leads.
+    eqLeadBodyL.setPeaking(420.0f, fs, 0.5f * config.warmth, 1.0f);
+    eqLeadBodyR.setPeaking(420.0f, fs, 0.5f * config.warmth, 1.0f);
 
     eqTameHarshL.setPeaking(1750.0f, fs, -4.8f * config.deharsh, 1.4f);
     eqTameHarshR.setPeaking(1750.0f, fs, -4.8f * config.deharsh, 1.4f);
@@ -140,11 +144,13 @@ void Chipgoodizer::updateFilters()
     eqShelfAirL.setHighShelf(8500.0f, fs, 3.0f * config.air);
     eqShelfAirR.setHighShelf(8500.0f, fs, 3.0f * config.air);
 
-    lowSubShelf.setLowShelf(95.0f, fs, 4.0f * config.rubber);
-    lowBodyPeaking.setPeaking(190.0f, fs, 2.2f * config.rubber, 1.2f);
+    // Low band internal shaping: punchy 78 Hz weight bell + 135 Hz body
+    // instead of a second low shelf that over-boosted 20-50 Hz sub-bass.
+    lowSubShelf.setPeaking(78.0f, fs, 1.6f * config.rubber, 0.80f);
+    lowBodyPeaking.setPeaking(135.0f, fs, 0.7f * config.rubber, 1.1f);
     lowSmooth.setLowPass(480.0f, fs, 0.707f);
 
-    lowPreGain = std::pow(10.0f, (2.5f * config.rubber) / 20.0f);
+    lowPreGain = std::pow(10.0f, (0.5f * config.rubber) / 20.0f);
     midPreGain = std::pow(10.0f, 1.5f / 20.0f);
     highPreGain = std::pow(10.0f, (2.0f * config.air) / 20.0f);
     driveLin = std::pow(10.0f, config.inputDriveDb / 20.0f);
