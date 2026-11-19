@@ -26,18 +26,18 @@ enum class Preset
 struct ChipgoodizerConfig
 {
     // Primary macro knobs (0.0 to 1.0)
-    float amount{0.85f};
-    float rubber{0.85f};
-    float punch{0.85f};
-    float air{0.70f};
-    float deharsh{0.50f};
-    float warmth{1.0f};
-    float width{0.60f};
-    float ambience{0.10f};
+    float amount{0.95f};
+    float rubber{0.90f};
+    float punch{1.00f};
+    float air{0.85f};
+    float deharsh{0.40f};
+    float warmth{0.88f};
+    float width{0.75f};
+    float ambience{0.15f};
 
     // Gain staging (dB)
-    float inputDriveDb{0.0f};
-    float ceilingDb{-1.2f};
+    float inputDriveDb{0.50f};
+    float ceilingDb{-1.0f};
 
     // Tunables
     float xoverLowHz{220.0f};

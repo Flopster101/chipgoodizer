@@ -16,7 +16,7 @@ struct cg_effect
 {
     cg_effect()
     {
-        const ChipgoodizerConfig defaults = ChipgoodizerConfig::getPreset(Preset::Commercial);
+        const ChipgoodizerConfig defaults = ChipgoodizerConfig::getPreset(Preset::PunchyClub);
         for (int i = 0; i < chipgoodizer::kParamCount; ++i)
             values[i].store(chipgoodizer::getParam(defaults, static_cast<ParamId>(i)), std::memory_order_relaxed);
     }

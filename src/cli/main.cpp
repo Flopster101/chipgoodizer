@@ -42,10 +42,10 @@ void printUsage()
 {
     std::cout << "Usage: chipgoodizer INPUT.wav OUTPUT.wav [options]\n\n"
               << "Presets:\n"
-              << "  --preset commercial     (Default tuned commercial sound)\n"
+              << "  --preset commercial     (Balanced default curve)\n"
               << "  --preset scope-safe     (Ceiling <= -6.2 dBFS for strict visual oscilloscope margins)\n"
               << "  --preset warm           (Midrange warmth, smoother highs)\n"
-              << "  --preset club           (Aggressive punch and driving low end)\n\n"
+              << "  --preset club           (Aggressive punch and driving low end; default)\n\n"
               << "Macro Knobs (0.0 - 1.0):\n"
               << "  --amount <0.0-1.0>      Wet/dry blend             (default: 0.85)\n"
               << "  --rubber <0.0-1.0>      Bass weight & sine dome   (default: 0.85)\n"
