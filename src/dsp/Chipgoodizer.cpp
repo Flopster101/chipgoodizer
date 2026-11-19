@@ -145,8 +145,8 @@ void Chipgoodizer::updateFilters()
     eqLeadBodyR.setPeaking(750.0f, fs, 1.8f * config.warmth, 0.70f);
 
     // Gentle anti-fatigue dip at 2.2 kHz to keep square-wave upper mids smooth.
-    eqTameHarshL.setPeaking(2200.0f, fs, -0.8f * config.deharsh, 1.1f);
-    eqTameHarshR.setPeaking(2200.0f, fs, -0.8f * config.deharsh, 1.1f);
+    eqTameHarshL.setPeaking(2200.0f, fs, -2.8f * config.deharsh, 1.1f);
+    eqTameHarshR.setPeaking(2200.0f, fs, -2.8f * config.deharsh, 1.1f);
 
     // Broad presence lift centered at 4.8 kHz; trimmed slightly so 4-5 kHz
     // does not poke ahead of upper-air sparkle.
