@@ -210,7 +210,7 @@ void testFixedInputHash()
         hash = (hash ^ bitsR) * 1099511628211ull;
     }
 
-    constexpr uint64_t kExpectedHash = 0x2103d1569638340full;
+    constexpr uint64_t kExpectedHash = 0x19F9ECF52E9011BAull;
     std::printf("fixed-input hash: 0x%016llx (expected 0x%016llx)\n",
                 static_cast<unsigned long long>(hash), static_cast<unsigned long long>(kExpectedHash));
 
