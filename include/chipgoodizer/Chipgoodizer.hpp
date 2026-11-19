@@ -162,6 +162,9 @@ private:
     EnvelopeFollower envLowFast;
     EnvelopeFollower envLowSlow;
 
+    EnvelopeFollower envLowImbL;
+    EnvelopeFollower envLowImbR;
+
     EnvelopeFollower envMidFastL;
     EnvelopeFollower envMidFastR;
     EnvelopeFollower envMidSlowL;

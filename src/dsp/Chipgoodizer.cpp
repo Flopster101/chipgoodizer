@@ -61,6 +61,10 @@ void Chipgoodizer::init(float sampleRate, const ChipgoodizerConfig &cfg)
     envLowFast.init(fs, 1.5f, 38.0f);
     envLowSlow.init(fs, 15.0f, 40.0f);
 
+    // Pan-imbalance detector for the mono-sum level compensation.
+    envLowImbL.init(fs, 10.0f, 40.0f);
+    envLowImbR.init(fs, 10.0f, 40.0f);
+
     // Mid band: smooth transient taper (0.8 ms / 28 ms) and quick-recovering
     // body detector (16 ms / 35 ms) so note releases stay full after attacks.
     envMidFastL.init(fs, 0.8f, 28.0f);
@@ -209,6 +213,8 @@ void Chipgoodizer::reset()
     lowSmooth.reset();
     envLowFast.reset();
     envLowSlow.reset();
+    envLowImbL.reset();
+    envLowImbR.reset();
 
     envMidFastL.reset();
     envMidFastR.reset();
@@ -289,6 +295,11 @@ void Chipgoodizer::applyPreEq(float &left, float &right)
 float Chipgoodizer::processLowBand(float lowLeft, float lowRight)
 {
     float lowMono = 0.5f * (lowLeft + lowRight);
+    // Hard-panned tracker kicks lose most of their tail in the mono anchor;
+    // level-compensate when one side carries the low band.
+    const float imbL = envLowImbL.process(lowLeft);
+    const float imbR = envLowImbR.process(lowRight);
+    lowMono *= 1.0f + std::abs(imbL - imbR) / (imbL + imbR + 1e-3f);
     lowMono *= lowPreGain;
 
     lowMono = lowSubShelf.process(lowMono);
