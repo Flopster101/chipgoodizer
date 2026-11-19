@@ -89,7 +89,7 @@ struct ChipgoodizerConfig
             cfg.warmth = 0.88f;
             cfg.width = 0.75f;
             cfg.ambience = 0.15f;
-            cfg.inputDriveDb = 1.5f;
+            cfg.inputDriveDb = 0.5f;
             cfg.ceilingDb = -1.0f;
             break;
         }
@@ -138,7 +138,6 @@ private:
     float lowPreGain{1.0f};
     float midPreGain{1.0f};
     float highPreGain{1.0f};
-    float masterScale{1.0f};
     float lowUpCeiling{1.36f};
 
     PhaseRotator rotator;

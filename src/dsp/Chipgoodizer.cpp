@@ -140,9 +140,9 @@ void Chipgoodizer::updateFilters()
     eqMudCutL.setPeaking(240.0f, fs, -1.6f, 1.0f);
     eqMudCutR.setPeaking(240.0f, fs, -1.6f, 1.0f);
 
-    // Subtle warmth fill around 420 Hz for hollow tracker pulse leads.
-    eqLeadBodyL.setPeaking(420.0f, fs, 0.25f * config.warmth, 1.0f);
-    eqLeadBodyR.setPeaking(420.0f, fs, 0.25f * config.warmth, 1.0f);
+    // Broad lead-body lift without adding weight to the kick fundamental.
+    eqLeadBodyL.setPeaking(750.0f, fs, 1.8f * config.warmth, 0.70f);
+    eqLeadBodyR.setPeaking(750.0f, fs, 1.8f * config.warmth, 0.70f);
 
     // Gentle anti-fatigue dip at 2.2 kHz to keep square-wave upper mids smooth.
     eqTameHarshL.setPeaking(2200.0f, fs, -0.8f * config.deharsh, 1.1f);
@@ -168,9 +168,6 @@ void Chipgoodizer::updateFilters()
     highPreGain = std::pow(10.0f, (3.6f * config.air) / 20.0f);
     driveLin = std::pow(10.0f, config.inputDriveDb / 20.0f);
     ceilingLin = std::pow(10.0f, config.ceilingDb / 20.0f);
-    // Calibrated master trim: matches commercial loudness without losing volume
-    // relative to the dry tracker render, while keeping clean headroom.
-    masterScale = std::pow(10.0f, 1.4f / 20.0f);
     lowUpCeiling = 1.0f + 0.62f * config.rubber;
 
     // Keep top-end air sparkle on the air knob and let deharsh tilt only gently
@@ -257,15 +254,15 @@ void Chipgoodizer::processStereo(float inL, float inR, float &outL, float &outR)
     float midHighR = midR + highR;
     applyAmbienceAndWidth(midHighL, midHighR);
 
-    float wetL = (procLow + midHighL) * masterScale;
-    float wetR = (procLow + midHighR) * masterScale;
+    float wetL = procLow + midHighL;
+    float wetR = procLow + midHighR;
 
     wetL = slewL.process(wetL);
     wetR = slewR.process(wetR);
 
     // Dry is post-EQ, so this blends rather than bypasses.
-    const float mixL = (1.0f - config.amount) * (drivenL * masterScale) + config.amount * wetL;
-    const float mixR = (1.0f - config.amount) * (drivenR * masterScale) + config.amount * wetR;
+    const float mixL = (1.0f - config.amount) * drivenL + config.amount * wetL;
+    const float mixR = (1.0f - config.amount) * drivenR + config.amount * wetR;
 
     outL = softClip(mixL, 0.86f) * ceilingLin;
     outR = softClip(mixR, 0.86f) * ceilingLin;
