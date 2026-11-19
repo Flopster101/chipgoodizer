@@ -72,8 +72,8 @@ void Chipgoodizer::init(float sampleRate, const ChipgoodizerConfig &cfg)
     // harshness detector (14 ms / 32 ms) to preserve note and cymbal tails.
     envHighFastL.init(fs, 0.8f, 25.0f);
     envHighFastR.init(fs, 0.8f, 25.0f);
-    envHighL.init(fs, 14.0f, 32.0f);
-    envHighR.init(fs, 14.0f, 32.0f);
+    envHighL.init(fs, 3.5f, 42.0f);
+    envHighR.init(fs, 3.5f, 42.0f);
 
     ambienceEngine.init(fs);
 
@@ -137,25 +137,25 @@ void Chipgoodizer::updateFilters()
     eqBassWarmthR.setPeaking(80.0f, fs, 1.1f * config.rubber, 0.85f);
 
     // Gentle mud dip at 205 Hz matching commercial low-mid cleanup.
-    eqMudCutL.setPeaking(205.0f, fs, -1.1f, 1.3f);
-    eqMudCutR.setPeaking(205.0f, fs, -1.1f, 1.3f);
+    eqMudCutL.setPeaking(240.0f, fs, -1.6f, 1.0f);
+    eqMudCutR.setPeaking(240.0f, fs, -1.6f, 1.0f);
 
     // Subtle warmth fill around 420 Hz for hollow tracker pulse leads.
-    eqLeadBodyL.setPeaking(420.0f, fs, 0.5f * config.warmth, 1.0f);
-    eqLeadBodyR.setPeaking(420.0f, fs, 0.5f * config.warmth, 1.0f);
+    eqLeadBodyL.setPeaking(420.0f, fs, 0.25f * config.warmth, 1.0f);
+    eqLeadBodyR.setPeaking(420.0f, fs, 0.25f * config.warmth, 1.0f);
 
     // Gentle anti-fatigue dip at 2.4 kHz to keep square-wave upper mids smooth.
-    eqTameHarshL.setPeaking(2400.0f, fs, -0.8f * config.deharsh, 1.0f);
-    eqTameHarshR.setPeaking(2400.0f, fs, -0.8f * config.deharsh, 1.0f);
+    eqTameHarshL.setPeaking(2200.0f, fs, -0.5f * config.deharsh, 1.1f);
+    eqTameHarshR.setPeaking(2200.0f, fs, -0.5f * config.deharsh, 1.1f);
 
     // Broad, musical brilliance lift centered at 4.0 kHz for crisp presence
     // without a harsh jump into 8-12 kHz.
-    eqLeadAirL.setPeaking(4000.0f, fs, 1.9f * config.air, 0.70f);
-    eqLeadAirR.setPeaking(4000.0f, fs, 1.9f * config.air, 0.70f);
+    eqLeadAirL.setPeaking(4800.0f, fs, 3.8f * config.air, 0.70f);
+    eqLeadAirR.setPeaking(4800.0f, fs, 3.8f * config.air, 0.70f);
 
     // Smooth air shelf (fixed RBJ coefficients).
-    eqShelfAirL.setHighShelf(7500.0f, fs, 1.5f * config.air);
-    eqShelfAirR.setHighShelf(7500.0f, fs, 1.5f * config.air);
+    eqShelfAirL.setHighShelf(9500.0f, fs, -1.5f * config.deharsh);
+    eqShelfAirR.setHighShelf(9500.0f, fs, -1.5f * config.deharsh);
 
     // Low band internal shaping: punchy 78 Hz weight bell + 135 Hz body
     // instead of a second low shelf that over-boosted 20-50 Hz sub-bass.
@@ -164,8 +164,8 @@ void Chipgoodizer::updateFilters()
     lowSmooth.setLowPass(480.0f, fs, 0.707f);
 
     lowPreGain = std::pow(10.0f, (0.5f * config.rubber) / 20.0f);
-    midPreGain = std::pow(10.0f, 0.7f / 20.0f);
-    highPreGain = std::pow(10.0f, (2.6f * config.air) / 20.0f);
+    midPreGain = std::pow(10.0f, 0.8f / 20.0f);
+    highPreGain = std::pow(10.0f, (3.6f * config.air) / 20.0f);
     driveLin = std::pow(10.0f, config.inputDriveDb / 20.0f);
     ceilingLin = std::pow(10.0f, config.ceilingDb / 20.0f);
     // Calibrated master trim: matches commercial loudness without losing volume
@@ -173,10 +173,10 @@ void Chipgoodizer::updateFilters()
     masterScale = std::pow(10.0f, 1.4f / 20.0f);
     lowUpCeiling = 1.0f + 0.62f * config.rubber;
 
-    highShelfL.setHighShelf(6500.0f, fs, 1.3f * config.air);
-    highShelfR.setHighShelf(6500.0f, fs, 1.3f * config.air);
-    highSmoothL.setLowPass(16500.0f, fs, 0.707f);
-    highSmoothR.setLowPass(16500.0f, fs, 0.707f);
+    highShelfL.setHighShelf(8500.0f, fs, -1.0f * config.deharsh);
+    highShelfR.setHighShelf(8500.0f, fs, -1.0f * config.deharsh);
+    highSmoothL.setLowPass(13500.0f, fs, 0.65f);
+    highSmoothR.setLowPass(13500.0f, fs, 0.65f);
 }
 
 void Chipgoodizer::reset()
@@ -375,35 +375,36 @@ void Chipgoodizer::processHighBand(float &left, float &right)
     const float slowL = envHighL.process(left);
     const float slowR = envHighR.process(right);
 
-    // Subtle, deadzoned high-band snap for crisp snare/hat hits without tail dip.
-    const float ratioL = std::max(0.0f, fastL - slowL) / (fastL + 1e-3f);
-    const float ratioR = std::max(0.0f, fastR - slowR) / (fastR + 1e-3f);
-    const float punchL = 1.0f + 0.40f * config.punch * std::max(0.0f, ratioL - 0.36f);
-    const float punchR = 1.0f + 0.40f * config.punch * std::max(0.0f, ratioR - 0.36f);
-
-    // Upward air sheen across the decay range preserves shimmer and note tails.
-    constexpr float kThreshHighUp = 0.11f;
+    // Adaptive target-level high band:
+    // - Dark sample-based tracker tracks (< 0.055) get upward air sheen.
+    // - Bright synth/AHX tracks with heavy white-noise drums (> 0.075) get
+    //   smooth downward de-essing instead of stacking boost on top of noise.
+    // No high-band transient boost here: spiking >3.8 kHz makes white-noise
+    // snares/hi-hats stab the ear; drum punch comes from Low and Mid bands.
+    constexpr float kThreshHighUp = 0.068f;
     const float highUpGainL = (slowL < kThreshHighUp && slowL > 1e-4f)
-                                  ? std::min(1.34f, std::pow(kThreshHighUp / slowL, 0.22f * config.air))
+                                  ? std::min(1.65f, std::pow(kThreshHighUp / slowL, 0.34f * config.air))
                                   : 1.0f;
     const float highUpGainR = (slowR < kThreshHighUp && slowR > 1e-4f)
-                                  ? std::min(1.34f, std::pow(kThreshHighUp / slowR, 0.22f * config.air))
+                                  ? std::min(1.65f, std::pow(kThreshHighUp / slowR, 0.34f * config.air))
                                   : 1.0f;
 
-    // Quick-recovering (32 ms) high-band control lets snare/hat attacks and
-    // note tails breathe while taming sustained harsh square-wave harmonics.
-    constexpr float kThreshHighDown = 0.30f;
-    const float highDownGainL = (slowL > kThreshHighDown)
-                                    ? std::pow(kThreshHighDown / slowL, 0.28f * config.deharsh)
+    // Combine fast and slow envelopes for downward de-essing so sudden
+    // white-noise drum bursts are caught immediately without pumping.
+    const float detL = std::max(slowL, 0.75f * fastL);
+    const float detR = std::max(slowR, 0.75f * fastR);
+    constexpr float kThreshHighDown = 0.115f;
+    const float highDownGainL = (detL > kThreshHighDown)
+                                    ? std::pow(kThreshHighDown / detL, 0.56f * config.deharsh)
                                     : 1.0f;
-    const float highDownGainR = (slowR > kThreshHighDown)
-                                    ? std::pow(kThreshHighDown / slowR, 0.28f * config.deharsh)
+    const float highDownGainR = (detR > kThreshHighDown)
+                                    ? std::pow(kThreshHighDown / detR, 0.56f * config.deharsh)
                                     : 1.0f;
 
     // No un-oversampled tanh here: nonlinear waveshaping above 3.8 kHz folds
     // aliasing harmonics back into the 2-10 kHz presence band as metallic grit.
-    left = highSmoothL.process(highShelfL.process(left * highUpGainL * highDownGainL * punchL));
-    right = highSmoothR.process(highShelfR.process(right * highUpGainR * highDownGainR * punchR));
+    left = highSmoothL.process(highShelfL.process(left * highUpGainL * highDownGainL));
+    right = highSmoothR.process(highShelfR.process(right * highUpGainR * highDownGainR));
 }
 
 void Chipgoodizer::applyAmbienceAndWidth(float &left, float &right)
