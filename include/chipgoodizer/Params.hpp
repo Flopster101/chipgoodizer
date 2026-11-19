@@ -55,7 +55,7 @@ inline const ParamSpec kParamSpecs[kParamCount] = {
     {"rubber", "Rubber", ParamType::Float, 0.0f, 1.0f, 0.85f, 0.1f},
     {"punch", "Punch", ParamType::Float, 0.0f, 1.0f, 0.85f, 0.1f},
     {"air", "Air", ParamType::Float, 0.0f, 1.0f, 0.70f, 0.1f},
-    {"deharsh", "De-Harsh", ParamType::Float, 0.0f, 1.0f, 1.00f, 0.1f},
+    {"deharsh", "De-Harsh", ParamType::Float, 0.0f, 1.0f, 0.50f, 0.1f},
     {"warmth", "Warmth", ParamType::Float, 0.0f, 1.0f, 1.00f, 0.1f},
     {"width", "Width", ParamType::Float, 0.0f, 1.0f, 0.60f, 0.1f},
     {"ambience", "Ambience", ParamType::Float, 0.0f, 0.30f, 0.10f, 0.1f},

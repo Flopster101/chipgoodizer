@@ -144,18 +144,18 @@ void Chipgoodizer::updateFilters()
     eqLeadBodyL.setPeaking(420.0f, fs, 0.25f * config.warmth, 1.0f);
     eqLeadBodyR.setPeaking(420.0f, fs, 0.25f * config.warmth, 1.0f);
 
-    // Gentle anti-fatigue dip at 2.4 kHz to keep square-wave upper mids smooth.
-    eqTameHarshL.setPeaking(2200.0f, fs, -0.5f * config.deharsh, 1.1f);
-    eqTameHarshR.setPeaking(2200.0f, fs, -0.5f * config.deharsh, 1.1f);
+    // Gentle anti-fatigue dip at 2.2 kHz to keep square-wave upper mids smooth.
+    eqTameHarshL.setPeaking(2200.0f, fs, -0.8f * config.deharsh, 1.1f);
+    eqTameHarshR.setPeaking(2200.0f, fs, -0.8f * config.deharsh, 1.1f);
 
-    // Broad, musical brilliance lift centered at 4.0 kHz for crisp presence
-    // without a harsh jump into 8-12 kHz.
-    eqLeadAirL.setPeaking(4800.0f, fs, 3.8f * config.air, 0.70f);
-    eqLeadAirR.setPeaking(4800.0f, fs, 3.8f * config.air, 0.70f);
+    // Broad presence lift centered at 4.8 kHz; trimmed slightly so 4-5 kHz
+    // does not poke ahead of upper-air sparkle.
+    eqLeadAirL.setPeaking(4800.0f, fs, 2.8f * config.air, 0.70f);
+    eqLeadAirR.setPeaking(4800.0f, fs, 2.8f * config.air, 0.70f);
 
-    // Smooth air shelf (fixed RBJ coefficients).
-    eqShelfAirL.setHighShelf(9500.0f, fs, -1.5f * config.deharsh);
-    eqShelfAirR.setHighShelf(9500.0f, fs, -1.5f * config.deharsh);
+    // Positive air shelf driven by air rather than statically cut by deharsh.
+    eqShelfAirL.setHighShelf(9000.0f, fs, 1.8f * config.air);
+    eqShelfAirR.setHighShelf(9000.0f, fs, 1.8f * config.air);
 
     // Low band internal shaping: punchy 78 Hz weight bell + 135 Hz body
     // instead of a second low shelf that over-boosted 20-50 Hz sub-bass.
@@ -173,10 +173,14 @@ void Chipgoodizer::updateFilters()
     masterScale = std::pow(10.0f, 1.4f / 20.0f);
     lowUpCeiling = 1.0f + 0.62f * config.rubber;
 
-    highShelfL.setHighShelf(8500.0f, fs, -1.0f * config.deharsh);
-    highShelfR.setHighShelf(8500.0f, fs, -1.0f * config.deharsh);
-    highSmoothL.setLowPass(13500.0f, fs, 0.65f);
-    highSmoothR.setLowPass(13500.0f, fs, 0.65f);
+    // Keep top-end air sparkle on the air knob and let deharsh tilt only gently
+    // while dynamic de-essing catches bright bursts.
+    const float highShelfDb = 1.2f * config.air - 1.0f * config.deharsh;
+    highShelfL.setHighShelf(8500.0f, fs, highShelfDb);
+    highShelfR.setHighShelf(8500.0f, fs, highShelfDb);
+    const float smoothCornerHz = 18500.0f - 4000.0f * config.deharsh;
+    highSmoothL.setLowPass(smoothCornerHz, fs, 0.707f);
+    highSmoothR.setLowPass(smoothCornerHz, fs, 0.707f);
 }
 
 void Chipgoodizer::reset()

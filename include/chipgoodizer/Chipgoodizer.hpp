@@ -30,7 +30,7 @@ struct ChipgoodizerConfig
     float rubber{0.85f};
     float punch{0.85f};
     float air{0.70f};
-    float deharsh{1.0f};
+    float deharsh{0.50f};
     float warmth{1.0f};
     float width{0.60f};
     float ambience{0.10f};
@@ -54,7 +54,7 @@ struct ChipgoodizerConfig
             cfg.rubber = 0.85f;
             cfg.punch = 0.85f;
             cfg.air = 0.70f;
-            cfg.deharsh = 1.00f;
+            cfg.deharsh = 0.50f;
             cfg.warmth = 1.00f;
             cfg.width = 0.60f;
             cfg.ambience = 0.10f;
@@ -72,7 +72,7 @@ struct ChipgoodizerConfig
             cfg.rubber = 0.90f;
             cfg.punch = 0.70f;
             cfg.air = 0.50f;
-            cfg.deharsh = 1.00f;
+            cfg.deharsh = 0.60f;
             cfg.warmth = 1.00f;
             cfg.width = 0.50f;
             cfg.ambience = 0.12f;
@@ -85,7 +85,7 @@ struct ChipgoodizerConfig
             cfg.rubber = 0.90f;
             cfg.punch = 1.00f;
             cfg.air = 0.85f;
-            cfg.deharsh = 0.88f;
+            cfg.deharsh = 0.40f;
             cfg.warmth = 0.88f;
             cfg.width = 0.75f;
             cfg.ambience = 0.15f;
