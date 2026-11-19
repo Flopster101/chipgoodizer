@@ -75,7 +75,7 @@ struct PresetSpec
 
 inline constexpr PresetSpec kPresetSpecs[] = {
     {Preset::Commercial, "commercial", "Commercial"},
-    {Preset::ScopeSafe, "scope-safe", "Scope Safe"},
+    {Preset::ScopeSafe, "scope-safe", "Safe"},
     {Preset::WarmChiptune, "warm", "Warm Chiptune"},
     {Preset::PunchyClub, "club", "Punchy Club"},
 };
